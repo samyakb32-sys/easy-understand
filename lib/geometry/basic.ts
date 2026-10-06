@@ -56,3 +56,13 @@ export function pentagonOnBase(s: number) {
   const C = pick(circleIntersections(B, s, A, diag), false); // adjacent to B
   return { A, B, C, D: apex, E, diag };
 }
+
+/** Point on an ellipse (y up) at parametric angle `t` degrees, centre c, semi-axes rx/ry, rotated rot degrees. */
+export function ellipsePoint(c: Point, rx: number, ry: number, rot: number, t: number): Point {
+  const a = (t * Math.PI) / 180, r = (rot * Math.PI) / 180;
+  const x = rx * Math.cos(a), y = ry * Math.sin(a);
+  return [c[0] + x * Math.cos(r) - y * Math.sin(r), c[1] + x * Math.sin(r) + y * Math.cos(r)];
+}
+
+/** Ramanujan's perimeter approximation. */
+export const ellipsePerimeter = (a: number, b: number) => Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));

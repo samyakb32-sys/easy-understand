@@ -22,9 +22,16 @@ Templates:
 - {"template":"pentagon","side":number}                                        regular pentagon on a given side
 - {"template":"cylinder_development","diameter":number,"height":number}        projections and development of a cylinder
 - {"template":"prism_views","side":number,"height":number}                      square prism standing on its base: front and top views
+- {"template":"isometric_prism","base":"rectangle"|"triangle"|"square"|"pentagon"|"hexagon","side":number,"width":number,"height":number,"scale":"isometric"|"true"}
+    isometric view of a prism standing on its base. "side" is the base side (for a rectangle it is the length and "width" is also required; leave "width" out otherwise).
+    scale: "isometric" when the problem says isometric PROJECTION (uses the 0.816 isometric scale), "true" when it says isometric VIEW/DRAWING or gives true lengths.
+- {"template":"isometric_cylinder","diameter":number,"height":number,"scale":"isometric"|"true"}   isometric view of a cylinder with a vertical axis
+- {"template":"section_polyhedron","solid":"prism"|"pyramid","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number,"angle":number,"axisHeight":number}
+    a prism or pyramid standing on its base, cut by a plane perpendicular to the VP and inclined "angle" degrees to the HP (1 to 80), crossing the axis "axisHeight" mm above the base. Asks for the sectional top view and the true shape of the section.
+- {"template":"section_round","solid":"cylinder"|"cone","diameter":number,"height":number,"angle":number,"axisHeight":number}   the same for a cylinder or cone
 - {"template":"unsupported","reason":string}                                  anything else, or numbers you cannot read; say briefly why
 
-If a number is unreadable or missing, use "unsupported" rather than guessing.`;
+If a number is unreadable or missing, use "unsupported" rather than guessing. If the cutting plane is described some other way (for example by a trace angle to the VP, or perpendicular to the HP), use "unsupported".`;
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {

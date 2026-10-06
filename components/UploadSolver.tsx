@@ -83,7 +83,7 @@ export function UploadSolver() {
         {busy ?? "Solve and teach me"}
       </button>
       {error && <p role="alert" className="callout">{error}</p>}
-      <p className="muted text-xs">Supports projection of lines, pentagon construction, cylinder development and prism views for now. More problem types are on the way.</p>
+      <p className="muted text-xs">Supports projection of lines, pentagon construction, cylinder development, prism views, isometric views of prisms and cylinders, and sections of prisms, pyramids, cylinders and cones. More problem types are on the way.</p>
     </div>
   );
 }

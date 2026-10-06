@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { LineStyle, Point, Primitive, Solution } from "@/lib/schema";
+import { ellipsePoint } from "@/lib/geometry/basic";
 import { primitiveLength, type Timeline } from "@/lib/timeline";
 
 const STROKE: Record<LineStyle, { w: number; color: string; dash?: string; opacity?: number }> = {
@@ -25,6 +26,8 @@ function bounds(sol: Solution) {
     for (const p of s.primitives) {
       if (p.t === "line") { add(p.a[0], -p.a[1]); add(p.b[0], -p.b[1]); }
       else if (p.t === "circle" || p.t === "arc") { add(p.c[0] - p.r, -p.c[1] - p.r); add(p.c[0] + p.r, -p.c[1] + p.r); }
+      else if (p.t === "ellipse") { const m = Math.max(p.rx, p.ry); add(p.c[0] - m, -p.c[1] - m); add(p.c[0] + m, -p.c[1] + m); }
+      else if (p.t === "poly") for (const q of p.pts) add(q[0], -q[1]);
       else { add(p.at[0], -p.at[1]); add(p.at[0] + p.text.length * 2.4, -p.at[1] - 4); }
     }
   const pad = 12;
@@ -39,6 +42,20 @@ function arcPath(c: Point, r: number, from: number, to: number): string {
   return `M ${a[0]} ${a[1]} A ${r} ${r} 0 ${large} ${sweep} ${b[0]} ${b[1]}`;
 }
 
+function ellipsePath(p: Extract<Primitive, { t: "ellipse" }>): string {
+  const rot = p.rot ?? 0, from = p.from ?? 0, to = p.to ?? 360;
+  const at = (t: number) => flip(ellipsePoint(p.c, p.rx, p.ry, rot, t));
+  const arc = (b: Point, large: number, sweep: number) => `A ${p.rx} ${p.ry} ${-rot} ${large} ${sweep} ${b[0]} ${b[1]}`;
+  const a = at(from);
+  // a closed ellipse starts and ends at the same point, which SVG draws as nothing: split it in two halves
+  if (Math.abs(to - from) >= 359.999) return `M ${a[0]} ${a[1]} ${arc(at(from + 180), 0, 0)} ${arc(a, 0, 0)}`;
+  return `M ${a[0]} ${a[1]} ${arc(at(to), Math.abs(to - from) > 180 ? 1 : 0, to >= from ? 0 : 1)}`;
+}
+
+function polyPoints(p: Extract<Primitive, { t: "poly" }>): Point[] {
+  return p.closed ? [...p.pts, p.pts[0]] : p.pts;
+}
+
 /** Point at fraction p along a primitive, in screen space. Null for text. */
 function tip(prim: Primitive, p: number): Point | null {
   if (prim.t === "line") return flip([prim.a[0] + (prim.b[0] - prim.a[0]) * p, prim.a[1] + (prim.b[1] - prim.a[1]) * p]);
@@ -46,6 +63,22 @@ function tip(prim: Primitive, p: number): Point | null {
   if (prim.t === "arc") {
     const a = prim.from + (prim.to - prim.from) * p;
     return flip([prim.c[0] + prim.r * Math.cos(rad(a)), prim.c[1] + prim.r * Math.sin(rad(a))]);
+  }
+  if (prim.t === "ellipse") {
+    const from = prim.from ?? 0, to = prim.to ?? 360;
+    return flip(ellipsePoint(prim.c, prim.rx, prim.ry, prim.rot ?? 0, from + (to - from) * p));
+  }
+  if (prim.t === "poly") {
+    const pts = polyPoints(prim);
+    const lens = pts.slice(1).map((q, i) => Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1]));
+    let want = lens.reduce((a, b) => a + b, 0) * p;
+    for (let i = 0; i < lens.length; i++) {
+      if (want <= lens[i] || i === lens.length - 1) {
+        const f = lens[i] === 0 ? 0 : Math.min(1, want / lens[i]);
+        return flip([pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f]);
+      }
+      want -= lens[i];
+    }
   }
   return null;
 }
@@ -92,6 +125,11 @@ export function DrawingCanvas({ solution, timeline, t, activeStep }: { solution:
     if (prim.t === "circle") {
       const [cx, cy] = flip(prim.c);
       return <circle {...common} {...draw} cx={cx} cy={cy} r={prim.r} transform={`rotate(0 ${cx} ${cy})`} />;
+    }
+    if (prim.t === "ellipse") return <path {...common} {...draw} d={ellipsePath(prim)} />;
+    if (prim.t === "poly") {
+      const d = polyPoints(prim).map((q, i) => { const f = flip(q); return `${i ? "L" : "M"} ${f[0]} ${f[1]}`; }).join(" ");
+      return <path {...common} {...draw} d={d} />;
     }
     return <path {...common} {...draw} d={arcPath(prim.c, prim.r, prim.from, prim.to)} />;
   });

@@ -11,7 +11,7 @@ npm run dev                  # http://localhost:3000
 npm test                     # geometry + schema tests
 ```
 
-The example lessons (`/solve/line-projection`, `pentagon`, `cylinder-development`, `prism-views`) work without any API key.
+The example lessons (`/solve/line-projection`, `pentagon`, `cylinder-development`, `prism-views`, `isometric-prism`, `isometric-cylinder`, `section-pyramid`, `section-prism`, `section-cylinder`) work without any API key.
 
 ## How it works
 
@@ -23,4 +23,4 @@ Adding a new problem type = add a template in `solvers.ts` and describe it in th
 
 ## Not done yet
 
-Payments (`lib/pricing.ts` is placeholders only), accounts and history, more problem types (sections, isometric), the OpenCV/OCR pre-processing step.
+Payments (`lib/pricing.ts` is placeholders only), accounts and history, the OpenCV/OCR pre-processing step, and some problem types (sections where the plane leaves through the base of a cone or cylinder, i.e. parabola/hyperbola; planes inclined to the VP; isometric of cones, spheres and composite solids).

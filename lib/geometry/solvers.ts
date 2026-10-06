@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { Point, Primitive, Solution, Step } from "../schema";
 import { circleIntersections, lineProjection, pentagonOnBase, round } from "./basic";
+import { solveIsometricCylinder, solveIsometricPrism } from "./isometric";
+import { solveSectionPolyhedron, solveSectionRound } from "./sections";
 
 /**
  * Deterministic solvers: the AI only classifies the problem and extracts the numbers (a Template);
@@ -17,6 +19,35 @@ export const Template = z.discriminatedUnion("template", [
   z.object({ template: z.literal("pentagon"), side: z.number().positive() }),
   z.object({ template: z.literal("cylinder_development"), diameter: z.number().positive(), height: z.number().positive() }),
   z.object({ template: z.literal("prism_views"), side: z.number().positive(), height: z.number().positive() }),
+  z.object({
+    template: z.literal("isometric_prism"),
+    base: z.enum(["rectangle", "triangle", "square", "pentagon", "hexagon"]),
+    /** side of a regular base, or the length of a rectangular one */
+    side: z.number().positive(),
+    width: z.number().positive().optional(),
+    height: z.number().positive(),
+    scale: z.enum(["isometric", "true"]).default("isometric"),
+  }),
+  z.object({ template: z.literal("isometric_cylinder"), diameter: z.number().positive(), height: z.number().positive(), scale: z.enum(["isometric", "true"]).default("isometric") }),
+  z.object({
+    template: z.literal("section_polyhedron"),
+    solid: z.enum(["prism", "pyramid"]),
+    base: z.enum(["triangle", "square", "pentagon", "hexagon"]),
+    side: z.number().positive(),
+    height: z.number().positive(),
+    /** inclination of the section plane to the HP, degrees */
+    angle: z.number().min(1).max(80),
+    /** where the plane crosses the axis, mm above the base */
+    axisHeight: z.number().min(0),
+  }),
+  z.object({
+    template: z.literal("section_round"),
+    solid: z.enum(["cylinder", "cone"]),
+    diameter: z.number().positive(),
+    height: z.number().positive(),
+    angle: z.number().min(1).max(80),
+    axisHeight: z.number().min(0),
+  }),
 ]);
 export type Template = z.infer<typeof Template>;
 
@@ -43,6 +74,14 @@ export function solveTemplate(t: Template): SolveResult {
       return { ok: true, solution: solveCylinder(t.diameter, t.height) };
     case "prism_views":
       return { ok: true, solution: solvePrism(t.side, t.height) };
+    case "isometric_prism":
+      return solveIsometricPrism(t);
+    case "isometric_cylinder":
+      return solveIsometricCylinder(t);
+    case "section_polyhedron":
+      return solveSectionPolyhedron(t);
+    case "section_round":
+      return solveSectionRound(t);
   }
 }
 

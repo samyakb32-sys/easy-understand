@@ -14,6 +14,10 @@ export const Primitive = z.discriminatedUnion("t", [
   z.object({ t: z.literal("circle"), c: Point, r: z.number().positive(), ...base }),
   /** Arc from angle `from` to `to` in degrees, counter-clockwise, y up. */
   z.object({ t: z.literal("arc"), c: Point, r: z.number().positive(), from: z.number(), to: z.number(), ...base }),
+  /** Ellipse rotated by `rot` degrees (ccw, y up). `from`/`to` are parametric angles for a partial ellipse. */
+  z.object({ t: z.literal("ellipse"), c: Point, rx: z.number().positive(), ry: z.number().positive(), rot: z.number().optional(), from: z.number().optional(), to: z.number().optional(), ...base }),
+  /** Connected straight segments, drawn as one stroke. */
+  z.object({ t: z.literal("poly"), pts: z.array(Point).min(2), closed: z.boolean().optional(), ...base }),
   z.object({ t: z.literal("text"), at: Point, text: z.string(), size: z.number().positive().optional() }),
 ]);
 export type Primitive = z.infer<typeof Primitive>;
@@ -33,6 +37,8 @@ export const SolidSpec = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("extrude"), profile: z.array(Point).min(3), height: z.number().positive() }),
   /** Profile of (radius, height) pairs revolved around the vertical axis. */
   z.object({ kind: z.literal("revolve"), profile: z.array(Point).min(2) }),
+  /** Polygon base (x,z) with the apex above its centre at `height`. */
+  z.object({ kind: z.literal("pyramid"), profile: z.array(Point).min(3), height: z.number().positive() }),
 ]);
 export type SolidSpec = z.infer<typeof SolidSpec>;
 
