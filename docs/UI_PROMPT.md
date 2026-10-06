@@ -2,7 +2,21 @@
 
 Build the front end for **EasyUnderstand**, a website where engineering students upload an Engineering Graphics & Design (EGD) problem, get the solution, and watch it drawn step by step like a professor teaching, then view the result in 3D.
 
-Tech: Next.js (App Router) + TypeScript + Tailwind, `three` + `@react-three/fiber` + `@react-three/drei` for 3D. Mobile-first and responsive. Light/dark theme. Calm, "digital blackboard / drafting paper" feel: off-white or dark slate background, blueprint-blue accents, a monospace or technical font for labels.
+Tech: Next.js (App Router) + TypeScript + Tailwind, `three` + `@react-three/fiber` + `@react-three/drei` (+ `framer-motion`, `@react-three/postprocessing`) for 3D and motion. Mobile-first and responsive.
+
+## Design direction: a 3D, premium, "I want this now" experience
+The whole site should feel like a 3D drafting studio, not a flat web page. A student should think "this is the app that finally makes EGD click" within 5 seconds, and want to buy it.
+- **Look:** dark, deep navy/near-black "blueprint void" with luminous cyan/electric-blue linework, one warm accent (amber) for calls to action. Glassmorphism panels with soft glow, subtle grain, crisp technical type (e.g. Space Grotesk / Inter for UI, JetBrains Mono for labels and dimensions). Light theme is optional; dark is the hero look.
+- **Hero is a live 3D scene (full-screen WebGL):** a glowing wireframe solid (cube / prism / cylinder) floats over a faint 3D drafting grid. On load, 2D orthographic views (front, top, side) draw themselves as neon lines on floating planes, then **fold and unfold into the 3D solid**, and the loop repeats. Mouse/touch parallax tilts the scene; scrolling moves the camera through the scene (scroll-driven storytelling with `ScrollControls` or GSAP ScrollTrigger). Add bloom (soft glow on lines), a pencil/compass tip that "draws" in 3D, and floating dimension labels.
+- **Landing story (scroll sections, each with a 3D moment):**
+  1. Hero: "Upload your EGD problem. Watch it solved, line by line, then turn it in 3D." Primary CTA "Solve my problem free" (amber, glowing) and secondary "Watch a demo".
+  2. "Snap it": a phone mockup in 3D scans a drawing; lines detected light up.
+  3. "Learn it": a professor-style step-by-step drawing plays live (a real, interactive mini player using the sample data, not a video).
+  4. "See it": the 2D views fold into a rotatable 3D model the visitor can drag.
+  5. Social proof: marks/grades improved stats, student testimonials (placeholder content, clearly marked), "Works for Orthographic projection, Isometric, Constructions, Sections, Development of surfaces".
+  6. Pricing section (see Monetisation below), FAQ, final CTA.
+- **Motion:** smooth 60 fps, spring physics, magnetic buttons, tilt-on-hover cards, micro-interactions on every control. Respect `prefers-reduced-motion` (static poster, no auto-animation). Lazy-load the 3D, show a lovely skeleton, cap DPR at 2, and fall back to a static image/2D if WebGL is unavailable. Lighthouse performance should stay reasonable on a mid-range phone.
+- **Everything interactive in the app is 3D-first:** the Solution page's drawing board is a 3D "desk" where the 2D sheet lies on a tilted drafting board with a floating pencil and compass; a toggle flips to the full 3D solid view; step changes animate the camera smoothly.
 
 ## Pages
 1. **Home `/`**
@@ -58,6 +72,15 @@ API (implemented separately, mock it for now):
 - Samples live in `lib/samples` (`SAMPLES[slug]`); the page for a sample slug reads them directly.
 
 Mock sample to start with (line AB, 60 mm, 30° to HP, 45° to VP): front view and top view drawn with construction lines first, then the final outline. Include at least 3 steps so the animation is visible.
+
+## Monetisation (UI only now; payment will be integrated later)
+Do NOT implement real payments, Stripe, or auth providers. Build the UI and structure so they can be added without redesign:
+- **Free vs Pro** model. Free: 3 solves/day, 2D step animation only, watermark on exports. Pro: unlimited solves, 3D model + unfold/section animations, save history, export drawing as PDF/PNG/GLB, read-aloud, priority solving.
+- Pricing section with 3 cards (Monthly, Yearly with "Best value, save 40%" badge highlighted and slightly 3D-tilted, "Exam pack" one-time) using placeholder prices clearly in one config file `lib/pricing.ts`.
+- Locked-feature moments: after a free solve, the 3D tab shows a **blurred, still-rotating 3D preview** with an "Unlock 3D with Pro" overlay; the export buttons show a lock icon. Every lock opens one `<UpgradeModal />` (benefits list, plan toggle, "Continue" button that currently just calls `startCheckout(planId)`).
+- Put all gating behind a single hook `useEntitlements()` that returns `{ plan: "free" | "pro", canUse3D, solvesLeftToday, ... }` reading from a mock provider now (a dev toggle in the footer switches plan), so a real backend can replace it later.
+- Stubs to leave for later: `startCheckout(planId)` (no-op that shows a "Payments coming soon" toast), `/login` and `/account` placeholder pages, a "Manage subscription" button, and a pricing-page analytics hook point. Add trust elements: "Cancel anytime", "Student discount" note, and a money-back line (placeholder text).
+- Conversion polish: sticky "Try free" bar after the hero, exit-intent soft nudge on desktop (non-intrusive, dismissible, once per session), and a live "students solved N problems today" counter (mocked).
 
 ## Quality bar
 Accessible (labels, focus rings, reduced-motion respects "no animation": jump straight to the finished step), no layout shift, works at 360 px width, drawing board never scrolls the page on touch, and all text uses plain student-friendly language.
