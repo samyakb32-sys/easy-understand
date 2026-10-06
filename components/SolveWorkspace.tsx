@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Solution } from "@/lib/schema";
 import { Solid3DViewer } from "./Solid3DViewer";
 import { StepPlayer } from "./StepPlayer";
+import { useEntitlements } from "./useEntitlements";
 
 export function SolveWorkspace({ initial, slug }: { initial: Solution | null; slug: string }) {
   const [sol, setSol] = useState<Solution | null>(initial);
   const [loaded, setLoaded] = useState(!!initial);
   const [tab, setTab] = useState<"2d" | "3d">("2d");
+  const pathname = usePathname();
+  const { me, loading } = useEntitlements();
+  const unlocked = !loading && !!me?.canUse3D;
 
   // a lesson made from an upload is passed through sessionStorage
   useEffect(() => {
@@ -46,7 +51,31 @@ export function SolveWorkspace({ initial, slug }: { initial: Solution | null; sl
           3D model{sol.solid ? "" : " (n/a)"}
         </button>
       </div>
-      {tab === "2d" || !sol.solid ? <StepPlayer solution={sol} /> : <Solid3DViewer spec={sol.solid} />}
+      {tab === "2d" || !sol.solid ? (
+        <StepPlayer solution={sol} />
+      ) : unlocked ? (
+        <Solid3DViewer spec={sol.solid} />
+      ) : (
+        // a blurred, still-turning preview: they can see what Pro gives them, but cannot use it
+        <div className="relative">
+          <div aria-hidden="true" style={{ filter: "blur(7px)", pointerEvents: "none" }}><Solid3DViewer spec={sol.solid} /></div>
+          <div className="lock-overlay" role="region" aria-label="3D is a Pro feature">
+            <div className="lock-card">
+              <div className="eyebrow">Pro feature</div>
+              <h3 className="prof-title">{loading ? "Checking your plan…" : "Unlock the 3D model"}</h3>
+              {!loading && (
+                <>
+                  <p className="muted">Rotate the solid and snap to its front, top and side views to see how the drawing connects to the real object.</p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    <Link href="/#pricing" className="btn btn-primary">See Pro plans</Link>
+                    {!me?.signedIn && me?.configured.auth && <Link href={`/login?next=${encodeURIComponent(pathname)}`} className="btn">Sign in</Link>}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

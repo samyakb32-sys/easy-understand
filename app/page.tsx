@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BurnIntro, HeroScene } from "@/components/HeroScene";
 import { DemoPlayer } from "@/components/DemoPlayer";
+import { NavAuth } from "@/components/NavAuth";
 import { PricingCards } from "@/components/PricingCards";
 import { UploadSolver } from "@/components/UploadSolver";
 
@@ -16,6 +17,7 @@ export default function Home() {
             <a href="#demo">Live lesson</a>
             <a href="#upload">Upload</a>
             <a href="#pricing" className="hide-sm">Pricing</a>
+            <NavAuth />
           </nav>
         </div>
       </header>
@@ -73,13 +75,21 @@ export default function Home() {
         <div className="wrap">
           <div className="eyebrow">Pricing</div>
           <h2>Start free</h2>
-          <p className="sec-lede">Paid plans are coming soon. The prices below are placeholders.</p>
+          <p className="sec-lede">Try everything on the examples for free. Pro unlocks unlimited AI solves, 3D models and saved lessons.</p>
           <PricingCards />
         </div>
       </section>
 
       <footer className="site">
-        <div className="wrap">EasyUnderstand 製図 · Learn engineering graphics by watching it drawn.</div>
+        <div className="wrap flex flex-wrap justify-between gap-3">
+          <span>EasyUnderstand 製図 · Learn engineering graphics by watching it drawn.</span>
+          <span className="flex gap-4">
+            <Link href="/legal/terms">Terms</Link>
+            <Link href="/legal/privacy">Privacy</Link>
+            <Link href="/legal/refunds">Refunds</Link>
+            <Link href="/legal/contact">Contact</Link>
+          </span>
+        </div>
       </footer>
     </main>
   );

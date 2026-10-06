@@ -2,6 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
+import { serviceRoleConfigured, solverNeedsLogin } from "@/lib/env";
+import { sameOrigin } from "@/lib/http";
+import { loadEntitlements } from "@/lib/me";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { currentUser } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
@@ -33,15 +38,45 @@ Templates:
 
 If a number is unreadable or missing, use "unsupported" rather than guessing. If the cutting plane is described some other way (for example by a trace angle to the VP, or perpendicular to the HP), use "unsupported".`;
 
+type Fail = { ok: false; reason: string; code?: "login_required" | "limit_reached" };
+const fail = (body: Fail, status: number) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ ok: false, reason: "The AI solver isn't configured yet (missing ANTHROPIC_API_KEY). Try one of the example lessons." }, { status: 503 });
+    return fail({ ok: false, reason: "The AI solver isn't configured yet (missing ANTHROPIC_API_KEY). Try one of the example lessons." }, 503);
   }
+  if (!sameOrigin(req)) return fail({ ok: false, reason: "Bad origin." }, 403);
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success || (!parsed.data.image && !parsed.data.text?.trim())) {
-    return NextResponse.json({ ok: false, reason: "Send a photo of the problem or type it in." }, { status: 400 });
+    return fail({ ok: false, reason: "Send a photo of the problem or type it in." }, 400);
   }
   const { image, mediaType = "image/jpeg", text } = parsed.data;
+
+  // Who is asking, and do they have a solve left today? Every AI call costs money, so this runs first.
+  let userId: string | null = null;
+  let isPro = false;
+  const gated = solverNeedsLogin();
+  if (gated) {
+    if (!serviceRoleConfigured()) return fail({ ok: false, reason: "Accounts aren't set up on this server yet, so the AI solver is switched off." }, 503);
+    const user = await currentUser();
+    if (!user) return fail({ ok: false, code: "login_required", reason: "Sign in to solve your own problems. The example lessons need no account." }, 401);
+    userId = user.id;
+    const ent = await loadEntitlements(user.id);
+    isPro = ent.isPro;
+    const { data, error } = await supabaseAdmin().rpc("consume_solve", { p_user: user.id, p_limit: ent.dailyLimit });
+    if (error) {
+      console.error("consume_solve failed", error);
+      return fail({ ok: false, reason: "Something went wrong. Please try again." }, 500);
+    }
+    if (!data) {
+      return fail({ ok: false, code: "limit_reached", reason: ent.isPro ? "You've reached today's fair-use limit. It resets at midnight India time." : `You've used your ${ent.dailyLimit} free solves for today. Upgrade to Pro for unlimited solves, or come back tomorrow.` }, 429);
+    }
+  }
+  // a failed attempt should not cost the student a solve
+  const refund = async () => {
+    if (userId) await supabaseAdmin().rpc("refund_solve", { p_user: userId }).then(() => {}, (e) => console.error("refund failed", e));
+  };
+  const give = async (body: Fail, status: number) => { await refund(); return fail(body, status); };
 
   const content: Anthropic.ContentBlockParam[] = [];
   if (image) content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: image } });
@@ -61,16 +96,24 @@ export async function POST(req: Request) {
     const raw = response.content.find((b) => b.type === "text")?.text ?? "";
     const json = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
     const reply = Reply.safeParse(JSON.parse(json));
-    if (!reply.success) return NextResponse.json({ ok: false, reason: "I couldn't understand that problem's numbers. Try a clearer photo, or type the problem." }, { status: 422 });
-    if (reply.data.template === "unsupported") return NextResponse.json({ ok: false, reason: reply.data.reason }, { status: 422 });
+    if (!reply.success) return give({ ok: false, reason: "I couldn't understand that problem's numbers. Try a clearer photo, or type the problem." }, 422);
+    if (reply.data.template === "unsupported") return give({ ok: false, reason: reply.data.reason }, 422);
 
     const result = solveTemplate(reply.data);
-    return NextResponse.json(result, { status: result.ok ? 200 : 422 });
+    if (!result.ok) return give({ ok: false, reason: result.reason }, 422);
+
+    // Pro students keep a history of their lessons
+    let savedId: string | null = null;
+    if (userId && isPro) {
+      const { data } = await supabaseAdmin().from("lessons").insert({ user_id: userId, title: result.solution.title, solution: result.solution }).select("id").single();
+      savedId = data?.id ?? null;
+    }
+    return NextResponse.json({ ...result, savedId }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) return NextResponse.json({ ok: false, reason: "Too many requests right now. Please try again in a minute." }, { status: 429 });
-    if (e instanceof Anthropic.AuthenticationError) return NextResponse.json({ ok: false, reason: "The AI solver's API key is invalid." }, { status: 503 });
-    if (e instanceof SyntaxError) return NextResponse.json({ ok: false, reason: "The AI gave an unreadable answer. Please try again." }, { status: 502 });
+    if (e instanceof Anthropic.RateLimitError) return give({ ok: false, reason: "Too many requests right now. Please try again in a minute." }, 429);
+    if (e instanceof Anthropic.AuthenticationError) return give({ ok: false, reason: "The AI solver's API key is invalid." }, 503);
+    if (e instanceof SyntaxError) return give({ ok: false, reason: "The AI gave an unreadable answer. Please try again." }, 502);
     console.error("solve failed", e);
-    return NextResponse.json({ ok: false, reason: "Something went wrong while solving. Please try again." }, { status: 500 });
+    return give({ ok: false, reason: "Something went wrong while solving. Please try again." }, 500);
   }
 }

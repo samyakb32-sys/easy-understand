@@ -122,7 +122,7 @@ section.block h2 { font-family: var(--font-display); font-weight: 400; font-size
 .plan { position: relative; display: flex; flex-direction: column; gap: 10px; }
 .plan.hl { border-color: var(--amber); box-shadow: 0 0 50px -15px rgba(255, 179, 71, .5); transform: perspective(900px) rotateY(-3deg); }
 .plan .price { font-family: var(--font-display); font-size: 2.4rem; }
-.plan ul { margin: 6px 0 14px; padding-left: 18px; color: var(--muted); flex: 1; }
+.plan ul { margin: 6px 0 14px; padding-left: 18px; color: var(--muted); flex: 1; list-style: disc; }
 .plan .badge { position: absolute; top: 14px; right: 14px; font-family: var(--font-mono); font-size: .65rem; letter-spacing: .12em; color: #1a1105; background: var(--amber); padding: 3px 8px; border-radius: 999px; text-transform: uppercase; }
 
 footer.site { border-top: 1px solid var(--line); padding: 36px 0 50px; color: var(--muted); font-size: .88rem; }
@@ -138,3 +138,14 @@ footer.site { border-top: 1px solid var(--line); padding: 36px 0 50px; color: va
 .tab.on { background: rgba(95, 227, 255, .12); color: var(--text); border-color: var(--cyan); }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- account, locks ---------- */
+.nav-account { display: inline-flex; align-items: center; gap: 8px; color: var(--text) !important; }
+.nav-signin { padding: 8px 16px !important; font-size: .85rem !important; color: var(--text) !important; }
+.pro-badge { font-family: var(--font-mono); font-size: .6rem; letter-spacing: .12em; color: #1a1105; background: var(--amber); padding: 2px 7px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+.lock-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(5, 8, 15, .45); border-radius: 18px; }
+.lock-card { max-width: 420px; text-align: center; background: var(--panel); backdrop-filter: blur(12px); border: 1px solid var(--amber); border-radius: 18px; padding: 24px; box-shadow: 0 0 60px -15px rgba(255, 179, 71, .5); }
+.lock-card .eyebrow { justify-content: center; color: var(--amber); }
+.lock-card .eyebrow::before { display: none; }
+footer.site a { text-decoration: none; }
+footer.site a:hover { color: var(--text); }

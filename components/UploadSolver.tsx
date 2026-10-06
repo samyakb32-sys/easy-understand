@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Solution } from "@/lib/schema";
 
@@ -23,6 +24,7 @@ export function UploadSolver() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
 
   const pick = (f: File | undefined | null) => {
     if (!f) return;
@@ -34,6 +36,7 @@ export function UploadSolver() {
 
   const solve = async () => {
     setError(null);
+    setCode(null);
     try {
       setBusy("Reading your drawing…");
       const image = file ? await toJpegBase64(file) : undefined;
@@ -44,7 +47,7 @@ export function UploadSolver() {
         body: JSON.stringify({ image, mediaType: image ? "image/jpeg" : undefined, text: text || undefined }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.reason ?? "Could not solve this problem.");
+      if (!data.ok) { setCode(data.code ?? null); throw new Error(data.reason ?? "Could not solve this problem."); }
       const sol = Solution.parse(data.solution);
       sessionStorage.setItem("eu:custom", JSON.stringify(sol));
       router.push("/solve/custom");
@@ -82,7 +85,13 @@ export function UploadSolver() {
       <button className="btn btn-primary w-full" disabled={!!busy || (!file && !text.trim())} onClick={solve}>
         {busy ?? "Solve and teach me"}
       </button>
-      {error && <p role="alert" className="callout">{error}</p>}
+      {error && (
+        <p role="alert" className="callout">
+          {error}{" "}
+          {code === "login_required" && <Link href={"/login?next=" + encodeURIComponent("/#upload")} className="underline">Sign in</Link>}
+          {code === "limit_reached" && <Link href="/#pricing" className="underline">See Pro plans</Link>}
+        </p>
+      )}
       <p className="muted text-xs">Supports projection of lines, pentagon construction, cylinder development, prism views, isometric views of prisms and cylinders, and sections of prisms, pyramids, cylinders and cones. More problem types are on the way.</p>
     </div>
   );
