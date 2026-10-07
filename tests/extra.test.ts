@@ -134,3 +134,25 @@ describe("templates", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("solids tilted to both HP and VP", () => {
+  it.each([
+    ["cone", () => solveTilted({ solid: "cone", diameter: 40, height: 60, angle: 40, phi: 30 })],
+    ["pyramid", () => solveTilted({ solid: "pyramid", base: "square", side: 30, height: 60, angle: 45, rest: "corner", phi: 35 })],
+    ["prism", () => solveTilted({ solid: "prism", base: "hexagon", side: 25, height: 50, angle: 30, rest: "edge", phi: 50 })],
+  ])("%s: eight steps, the plan of the axis makes phi with XY, depth stays in front of XY", (_n, mk) => {
+    const s = ok(mk());
+    expect(s.steps).toHaveLength(8);
+    const ys5 = ys(prims(s, 5));
+    expect(Math.max(...ys5)).toBeLessThan(-1e-6); // whole turned top view is below XY
+    const axis = prims(s, 5).find((p) => p.t === "line" && p.style === "construction" && p.a[1] !== p.b[1]);
+    if (!axis || axis.t !== "line") throw new Error("no axis");
+    const ang = Math.abs((Math.atan2(axis.b[1] - axis.a[1], axis.b[0] - axis.a[0]) * 180) / Math.PI);
+    expect(ang).toBeCloseTo(s.problem.includes("30°") && _n === "cone" ? 30 : _n === "pyramid" ? 35 : 50, 4);
+  });
+  it("heights are unchanged by the second turn", () => {
+    const s = ok(solveTilted({ solid: "pyramid", base: "square", side: 30, height: 60, angle: 45, rest: "corner", phi: 35 }));
+    const zs = (st: number) => ys(prims(s, st).filter((p) => p.t === "line" && p.style !== "construction"));
+    expect(Math.max(...zs(7))).toBeCloseTo(Math.max(...zs(2)), 4);
+  });
+});

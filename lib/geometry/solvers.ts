@@ -63,6 +63,8 @@ export const Template = z.discriminatedUnion("template", [
     height: z.number().positive(),
     /** inclination of the axis to the HP, degrees */
     angle: z.number().min(1).max(89),
+    /** inclination of the PLAN (top view) of the axis to the VP, degrees. Leave out when the axis is only tilted to the HP. */
+    phi: z.number().min(1).max(89).optional(),
     rest: z.enum(["corner", "edge"]).default("corner"),
   }),
   z.object({
@@ -117,9 +119,9 @@ export function solveTemplate(t: Template): SolveResult {
     case "development_prism":
       return solvePrismDevelopment(t.base, t.side, t.height);
     case "solid_inclined":
-      if (t.solid === "cone") return solveTilted({ solid: "cone", diameter: t.size, height: t.height, angle: t.angle });
+      if (t.solid === "cone") return solveTilted({ solid: "cone", diameter: t.size, height: t.height, angle: t.angle, phi: t.phi });
       if (!t.base) return { ok: false, reason: "Tell me the base shape (triangle, square, pentagon or hexagon)." };
-      return solveTilted({ solid: t.solid, base: t.base, side: t.size, height: t.height, angle: t.angle, rest: t.rest });
+      return solveTilted({ solid: t.solid, base: t.base, side: t.size, height: t.height, angle: t.angle, rest: t.rest, phi: t.phi });
     case "plane_inclined":
       return solveTilted({ shape: t.shape, size: t.size, angle: t.angle, rest: t.rest });
   }
