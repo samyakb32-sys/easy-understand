@@ -33,6 +33,8 @@ export const SAMPLES: Record<string, Solution> = {
   "cone-hp-vp": mustSolve(solveTilted({ solid: "cone", diameter: 40, height: 60, angle: 40, phi: 30 })),
   "pyramid-hp-vp": mustSolve(solveTilted({ solid: "pyramid", base: "square", side: 30, height: 60, angle: 45, rest: "corner", phi: 35 })),
   "prism-hp-vp": mustSolve(solveTilted({ solid: "prism", base: "hexagon", side: 25, height: 50, angle: 30, rest: "edge", phi: 50 })),
+  "plane-hp-vp": mustSolve(solveTilted({ shape: "hexagon", size: 25, angle: 45, rest: "edge", phi: 30 })),
+  "circle-hp-vp": mustSolve(solveTilted({ shape: "circle", size: 50, angle: 30, rest: "edge", phi: 40 })),
   "plane-inclined": mustSolve(solveTilted({ shape: "pentagon", size: 30, angle: 45, rest: "edge" })),
 };
 
@@ -58,5 +60,7 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "cone-hp-vp": "Projection of solids",
   "pyramid-hp-vp": "Projection of solids",
   "prism-hp-vp": "Projection of solids",
+  "plane-hp-vp": "Projection of planes",
+  "circle-hp-vp": "Projection of planes",
   "plane-inclined": "Projection of planes",
 };

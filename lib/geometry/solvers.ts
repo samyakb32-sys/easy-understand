@@ -74,6 +74,8 @@ export const Template = z.discriminatedUnion("template", [
     size: z.number().positive(),
     /** inclination of the surface to the HP, degrees */
     angle: z.number().min(1).max(89),
+    /** inclination to the VP of the side (or diameter) that lies in the HP, degrees. Leave out when only tilted to the HP. */
+    phi: z.number().min(1).max(89).optional(),
     rest: z.enum(["corner", "edge"]).default("edge"),
   }),
 ]);
@@ -123,7 +125,7 @@ export function solveTemplate(t: Template): SolveResult {
       if (!t.base) return { ok: false, reason: "Tell me the base shape (triangle, square, pentagon or hexagon)." };
       return solveTilted({ solid: t.solid, base: t.base, side: t.size, height: t.height, angle: t.angle, rest: t.rest, phi: t.phi });
     case "plane_inclined":
-      return solveTilted({ shape: t.shape, size: t.size, angle: t.angle, rest: t.rest });
+      return solveTilted({ shape: t.shape, size: t.size, angle: t.angle, rest: t.rest, phi: t.phi });
   }
 }
 

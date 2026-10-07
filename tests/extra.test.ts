@@ -156,3 +156,19 @@ describe("solids tilted to both HP and VP", () => {
     expect(Math.max(...zs(7))).toBeCloseTo(Math.max(...zs(2)), 4);
   });
 });
+
+describe("planes inclined to HP and VP", () => {
+  it.each([["hexagon", 30], ["square", 60], ["triangle", 45]] as const)("%s: the side in the HP ends up at %s° to XY and heights are kept", (shape, phi) => {
+    const s = ok(solveTilted({ shape, size: 30, angle: 40, rest: "edge", phi }));
+    expect(s.steps).toHaveLength(8);
+    const mark = prims(s, 5).find((p) => p.t === "arc");
+    if (!mark || mark.t !== "arc") throw new Error("no arc");
+    expect(Math.abs(mark.to - mark.from)).toBeCloseTo(phi, 4);
+    const fvY = ys(prims(s, 7));
+    expect(Math.max(...fvY)).toBeCloseTo(Math.max(...ys(prims(s, 2).filter((p) => p.t === "line" && p.style === "outline"))), 4);
+    expect(Math.max(...ys(prims(s, 5).filter((p) => p.t === "poly")))).toBeLessThan(0);
+  });
+  it("needs the lamina to rest on a side", () => {
+    expect(solveTilted({ shape: "square", size: 30, angle: 40, rest: "corner", phi: 30 }).ok).toBe(false);
+  });
+});

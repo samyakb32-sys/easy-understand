@@ -165,7 +165,8 @@ function views(b: Built, a: number, dx: number, phi = 0, dx2 = 0, dy = 0): Views
     const xs = ring.map((v) => v[0]);
     const zs = ring.map((v) => v[2]);
     const iMin = xs.indexOf(Math.min(...xs)), iMax = xs.indexOf(Math.max(...xs));
-    fv.push(line([xs[iMin], zs[iMin]], [xs[iMax], zs[iMax]], "outline"));
+    if (phi) fv.push({ t: "poly", pts: ring.map(fvP), closed: true, style: "outline" });
+    else fv.push(line([xs[iMin], zs[iMin]], [xs[iMax], zs[iMax]], "outline"));
     tv.push({ t: "poly", pts: ring.map(tvP), closed: true, style: "outline" });
     return done(fv, tv, s.corners.map(p));
   }
@@ -223,18 +224,20 @@ function views(b: Built, a: number, dx: number, phi = 0, dx2 = 0, dy = 0): Views
   return done(fv, tv, [apex, rim[0], rim[N / 4], rim[N / 2], rim[(3 * N) / 4]]);
 }
 
+const input_isCircle = (sp: Spec) => sp.solid === "plane" && sp.n === "circle";
 const POLY_NAME = (n: number) => ({ 3: "triangle", 4: "square", 5: "pentagon", 6: "hexagon" })[n] ?? `${n}-gon`;
 
 export type TiltInput =
   | { solid: "prism" | "pyramid"; base: RegularBase; side: number; height: number; angle: number; rest: "corner" | "edge"; /** plan of the axis to the VP, degrees */ phi?: number }
   | { solid: "cone"; diameter: number; height: number; angle: number; phi?: number }
-  | { shape: RegularBase | "circle"; size: number; angle: number; rest: "corner" | "edge" };
+  | { shape: RegularBase | "circle"; size: number; angle: number; rest: "corner" | "edge"; /** the side (or diameter) in the HP, inclined to the VP, degrees */ phi?: number };
 
 export function solveTilted(input: TiltInput): Result {
   const isPlane = "shape" in input;
   const theta = input.angle;
   if (!(theta > 0 && theta < 90)) return { ok: false, reason: "The inclination must be between 0° and 90°." };
-  const phiDeg = !("shape" in input) && input.phi ? input.phi : 0;
+  const phiDeg = input.phi ?? 0;
+  if (phiDeg && "shape" in input && input.shape !== "circle" && input.rest !== "edge") return { ok: false, reason: "To give the inclination of a side to the VP, the lamina must rest on that side (on the HP)." };
   if (phiDeg && !(phiDeg > 0 && phiDeg < 90)) return { ok: false, reason: "The inclination to the VP must be between 0° and 90°." };
 
   let spec: Spec;
@@ -244,11 +247,11 @@ export function solveTilted(input: TiltInput): Result {
     const n = input.shape === "circle" ? "circle" : SIDES[input.shape];
     spec = { solid: "plane", n, size: input.size, rest: input.rest };
     const name = input.shape === "circle" ? "circle" : input.shape;
-    title = `Projection of a ${name} lamina`;
+    title = `Projection of a ${name} lamina${phiDeg ? " inclined to HP and VP" : ""}`;
     problem = input.shape === "circle"
-      ? `A circular lamina of diameter ${input.size} mm rests on the HP on a point of its circumference, with its surface inclined at ${theta}° to the HP. Draw its projections.`
-      : `A ${name} lamina of side ${input.size} mm rests on the HP on ${input.rest === "edge" ? "one side" : "one corner"}, with its surface inclined at ${theta}° to the HP. Draw its projections.`;
-    givens = [{ name: input.shape === "circle" ? "Diameter" : "Side", value: `${input.size} mm` }, { name: "Surface inclined to HP", value: `${theta}°` }];
+      ? `A circular lamina of diameter ${input.size} mm rests on the HP on a point of its circumference, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and the diameter in the HP inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`
+      : `A ${name} lamina of side ${input.size} mm rests on the HP on ${input.rest === "edge" ? "one side" : "one corner"}, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and that side inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`;
+    givens = [{ name: input.shape === "circle" ? "Diameter" : "Side", value: `${input.size} mm` }, { name: "Surface inclined to HP", value: `${theta}°` }, ...(phiDeg ? [{ name: input.shape === "circle" ? "Diameter to VP" : "Side to VP", value: `${phiDeg}°` }] : [])];
   } else if (input.solid === "cone") {
     spec = { solid: "cone", r: input.diameter / 2, height: input.height };
     title = phiDeg ? "Cone with its axis inclined to the HP and VP" : "Cone with its axis inclined to the HP";
@@ -271,7 +274,7 @@ export function solveTilted(input: TiltInput): Result {
   // shift the final views to the right of the initial ones
   const dx = built.maxX + 30 - probe.minX;
   const fin = views(built, a, dx);
-  const phi = rad(phiDeg);
+  const phi = rad(isPlane ? 90 - phiDeg : phiDeg); // a lamina's tilt edge starts perpendicular to XY, so it turns through 90 - phi
   const dx2 = fin.maxX + 30 - views(built, a, dx, phi).minX;
   const probe2 = views(built, a, dx, phi, dx2);
   const dy = GAP - probe2.minY;
@@ -368,6 +371,19 @@ export function solveTilted(input: TiltInput): Result {
       return [px + (x1 - px) * c + (y1 - py) * sn + dx2, -(py - (x1 - px) * sn + (y1 - py) * c + dy)];
     };
     const sh = built.shape;
+    let turnMark: Primitive[];
+    if (sh.kind === "plane") {
+      const idx = input_isCircle(spec) ? [1, 3] : sh.corners.map((c, i) => (c[0] >= built.maxX - 1e-9 ? i : -1)).filter((i) => i >= 0);
+      let A = turn(sh.corners[idx[0]]), B = turn(sh.corners[idx[1]]);
+      if (B[0] < A[0]) [A, B] = [B, A];
+      const ang = (Math.atan2(B[1] - A[1], B[0] - A[0]) * 180) / Math.PI;
+      const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+      turnMark = [
+        line([A[0] - 5, A[1]], [A[0] + len + 8, A[1]], "construction"),
+        { t: "arc", c: A, r: Math.min(14, len / 2), from: Math.min(0, ang), to: Math.max(0, ang), style: "construction" },
+        text([A[0] + 16, A[1] + (ang > 0 ? 3 : -5)], `${phiDeg}°`),
+      ];
+    } else {
     const poly = sh as Poly3;
     const half = poly.apex !== undefined ? poly.apex : (poly.verts?.length ?? 0) / 2;
     const apex2 = sh.kind === "cone" ? turn([sh.centre[0], sh.centre[1], sh.h]) : turn(poly.apex !== undefined ? poly.verts[poly.apex] : mean(poly.verts.slice(half)));
@@ -375,15 +391,16 @@ export function solveTilted(input: TiltInput): Result {
     // reference line through the base centre, parallel to XY, and the angle to the plan of the axis
     const len = Math.hypot(apex2[0] - cen2[0], apex2[1] - cen2[1]);
     const up = apex2[1] > cen2[1];
-    const turnMark: Primitive[] = [
+    turnMark = [
       line([cen2[0] - 5, cen2[1]], [cen2[0] + len + 8, cen2[1]], "construction"),
       line(cen2, apex2, "construction"),
       { t: "arc", c: cen2, r: Math.min(14, len / 2), from: up ? 0 : -phiDeg, to: up ? phiDeg : 0, style: "construction" },
       text([cen2[0] + 16, cen2[1] + (up ? 3 : -5)], `${phiDeg}°`),
     ];
+    }
     steps.push({
       title: `Turn the top view through ${phiDeg}°`,
-      explanation: `Copy the final top view to a new place, turned so the plan of the axis makes ${phiDeg}° with XY. Its size and shape do not change, and the solid still touches the HP at the same point. Edges that are hidden are dotted.`,
+      explanation: isPlane ? `Copy the final top view to a new place, turned so the side (or diameter) that lies in the HP makes ${phiDeg}° with XY. Its shape does not change.` : `Copy the final top view to a new place, turned so the plan of the axis makes ${phiDeg}° with XY. Its size and shape do not change, and the solid still touches the HP at the same point. Edges that are hidden are dotted.`,
       style: "outline",
       primitives: [...turnMark, ...fin2.tv],
     });
