@@ -1,14 +1,41 @@
 import type { Point, Primitive, Solution, Step } from "../schema";
 import { round } from "./basic";
 
-type Result = { ok: true; solution: Solution } | { ok: false; reason: string };
+export type Result = { ok: true; solution: Solution } | { ok: false; reason: string };
 
-const line = (a: Point, b: Point, style?: "construction" | "outline" | "hidden" | "centre"): Primitive => ({ t: "line", a, b, ...(style ? { style } : {}) });
-const text = (at: Point, s: string): Primitive => ({ t: "text", at, text: s });
-const dot = (c: Point): Primitive => ({ t: "circle", c, r: 0.8 });
-const GAP = 18;
+export const line = (a: Point, b: Point, style?: "construction" | "outline" | "hidden" | "centre"): Primitive => ({ t: "line", a, b, ...(style ? { style } : {}) });
+export const text = (at: Point, s: string): Primitive => ({ t: "text", at, text: s });
+export const dot = (c: Point): Primitive => ({ t: "circle", c, r: 0.8 });
+export const GAP = 18;
 const rect = (x0: number, z0: number, x1: number, z1: number, style?: "construction" | "outline" | "hidden"): Primitive[] =>
   [line([x0, z0], [x1, z0], style), line([x1, z0], [x1, z1], style), line([x1, z1], [x0, z1], style), line([x0, z1], [x0, z0], style)];
+
+/** One label per spot: points that land on the same place in a view share it, e.g. "1,7". Labels are moved to a free corner when they would overlap. */
+export function groupLabels(items: { p: Point; n: number }[], dx = 1.2, dy = 1.2): Primitive[] {
+  const spots: { p: Point; ns: number[] }[] = [];
+  for (const { p, n } of items) {
+    const s = spots.find((q) => Math.hypot(q.p[0] - p[0], q.p[1] - p[1]) < 0.6);
+    if (s) s.ns.push(n);
+    else spots.push({ p, ns: [n] });
+  }
+  const placed: [number, number, number, number][] = [];
+  return spots.map(({ p, ns }) => {
+    const s = ns.sort((a, b) => a - b).join(","), w = 1.9 * s.length;
+    const corners: Point[] = [[dx, dy], [dx, -dy - 2.4], [-dx - w, dy], [-dx - w, -dy - 2.4], [dx, dy + 3], [-dx - w, dy + 3], [dx, -dy - 5.4], [-dx - w, -dy - 5.4]];
+    const box = ([cx, cy]: Point): [number, number, number, number] => [p[0] + cx, p[1] + cy, p[0] + cx + w, p[1] + cy + 2.4];
+    const free = (b: [number, number, number, number]) => placed.every((q) => b[0] > q[2] + 0.3 || b[2] < q[0] - 0.3 || b[1] > q[3] + 0.3 || b[3] < q[1] - 0.3);
+    const at = corners.find((c) => free(box(c))) ?? corners[0];
+    placed.push(box(at));
+    return text([p[0] + at[0], p[1] + at[1]], s);
+  });
+}
+
+/** A label just outside the circle (centre c, radius r) in direction `deg`, clear of the circle whatever its length. */
+export function radialLabel(c: Point, r: number, deg: number, s: string): Primitive {
+  const a = (deg * Math.PI) / 180, co = Math.cos(a), si = Math.sin(a), w = 1.9 * s.length;
+  const d = r + 1.5 + (w / 2) * Math.abs(co) + 1.2 * Math.abs(si);
+  return text([c[0] + d * co - w / 2, c[1] + d * si - 1.2], s);
+}
 
 export type CylinderPenetration = {
   mainDiameter: number;
@@ -63,7 +90,6 @@ export function solveCylinderPenetration(i: CylinderPenetration): Result {
   const tvBranch: Primitive[] = [
     line([xc, cyTV - r], [L, cyTV - r]), line([xc, cyTV + r], [L, cyTV + r]), line([L, cyTV - r], [L, cyTV + r]),
     line([-xc, cyTV - r], [-L, cyTV - r]), line([-xc, cyTV + r], [-L, cyTV + r]), line([-L, cyTV - r], [-L, cyTV + r]),
-    line([-xc, cyTV - r], [xc, cyTV - r], "hidden"), line([-xc, cyTV + r], [xc, cyTV + r], "hidden"),
   ];
 
   const steps: Step[] = [
@@ -83,25 +109,31 @@ export function solveCylinderPenetration(i: CylinderPenetration): Result {
       title: "Divide the circle into 12 parts",
       explanation: "In the side view, divide the circle of the branch into 12 equal parts and number the points 1 to 12. Each point is a place where the surface of the branch meets the surface of the main cylinder.",
       style: "construction",
-      primitives: ts.flatMap((t) => [dot(svPt(t)), text([svPt(t)[0] + 1.5, svPt(t)[1] + 1.5], label(t))]),
+      primitives: ts.flatMap((t) => [dot(svPt(t)), radialLabel([cxSV, zc], r, t, label(t))]),
     },
     {
       title: "Find the points in the top view",
       explanation: `Each point is ${round(r)}·cos θ from the axis in the side view, which is its depth in the top view. Draw a line across the top-view circle at that depth. The vertical cylinder is end-on in the top view, so the point must lie where this line meets the circle (on both the left and the right).`,
       style: "construction",
-      primitives: ts.flatMap((t) => {
-        const y = yOf(t), x = xOf(t), v = cyTV - y;
-        return [line([-x, v], [x, v]), dot([x, v]), dot([-x, v])];
-      }),
+      primitives: [
+        ...ts.flatMap((t) => {
+          const y = yOf(t), x = xOf(t), v = cyTV - y;
+          return [line([-x, v], [x, v]), dot([x, v]), dot([-x, v])];
+        }),
+        ...groupLabels(ts.map((t) => ({ p: [xOf(t), cyTV - yOf(t)] as Point, n: Number(label(t)) }))),
+      ],
     },
     {
       title: "Project up to the front view",
       explanation: "From each point in the top view draw a vertical line up to the front view. From the same numbered point in the side view draw a horizontal line across to the front view. Where they cross is the front view of that point.",
       style: "construction",
-      primitives: ts.flatMap((t) => {
-        const x = xOf(t), z = zOf(t), v = cyTV - yOf(t);
-        return [line([x, v], [x, z]), line([-x, v], [-x, z]), line(svPt(t), [-x, z]), text([x + 1, z + 1], label(t))];
-      }),
+      primitives: [
+        ...ts.flatMap((t) => {
+          const x = xOf(t), z = zOf(t), v = cyTV - yOf(t);
+          return [line([x, v], [x, z]), line([-x, v], [-x, z]), line(svPt(t), [-x, z])];
+        }),
+        ...groupLabels(ts.map((t) => ({ p: [xOf(t), zOf(t)] as Point, n: Number(label(t)) }))),
+      ],
     },
     {
       title: "Draw the curve of intersection",

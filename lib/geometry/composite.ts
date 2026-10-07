@@ -18,13 +18,15 @@ const C30 = Math.cos(Math.PI / 6), S30 = 0.5;
 const line = (a: Point, b: Point, style?: "construction" | "outline" | "centre"): Primitive => ({ t: "line", a, b, ...(style ? { style } : {}) });
 const text = (at: Point, s: string): Primitive => ({ t: "text", at, text: s });
 
+const NEEDS_WIDTH = "A rectangular prism needs both a length and a width.";
+
 // ---------------------------------------------------------------- 2D helpers
 
 type Poly = Point[];
 const cross = (o: Point, a: Point, b: Point) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
 
 /** Convex hull, counter-clockwise. */
-function hull(pts: Point[]): Point[] {
+export function hull(pts: Point[]): Point[] {
   const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const lower: Point[] = [], upper: Point[] = [];
   for (const q of p) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q); }
@@ -32,35 +34,46 @@ function hull(pts: Point[]): Point[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** The pieces of segment a-b that lie outside the (strictly inner part of the) convex polygon `h`. */
-function clipOutside(a: Point, b: Point, h: Point[]): [Point, Point][] {
+/** The part [t0, t1] of segment a-b (as fractions of its length) that lies strictly inside the convex counter-clockwise polygon `h`, or null. */
+export function insideSpan(a: Point, b: Point, h: Point[]): [number, number] | null {
   const EPS = 1e-6;
   let t0 = 0, t1 = 1;
   for (let i = 0; i < h.length; i++) {
     const p = h[i], q = h[(i + 1) % h.length];
     const fa = cross(p, q, a) - EPS * Math.hypot(q[0] - p[0], q[1] - p[1]);
     const fb = cross(p, q, b) - EPS * Math.hypot(q[0] - p[0], q[1] - p[1]);
-    if (fa <= 0 && fb <= 0) return [[a, b]]; // wholly outside this edge's half-plane
+    if (fa <= 0 && fb <= 0) return null; // wholly outside this edge's half-plane
     if (fa < 0 !== fb < 0) {
       const t = fa / (fa - fb);
       if (fa < 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t);
     }
   }
-  if (t0 >= t1) return [[a, b]];
+  return t0 < t1 ? [t0, t1] : null;
+}
+
+type Seg = [Point, Point];
+
+/** The pieces of segment a-b that remain when the stretch [t0, t1] (fractions of its length) is removed. */
+export function outsideSpan(a: Point, b: Point, [t0, t1]: [number, number]): Seg[] {
   const at = (t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-  const out: [Point, Point][] = [];
+  const out: Seg[] = [];
   if (t0 > 1e-9) out.push([a, at(t0)]);
   if (t1 < 1 - 1e-9) out.push([at(t1), b]);
   return out;
 }
 
-/** Remove the parts of polylines that fall inside any of the hulls. Open pieces are returned. */
-function clipPolylines(lines: Poly[], hulls: Point[][]): Poly[] {
-  let cur: [Point, Point][] = lines.flatMap((pl) => pl.slice(0, -1).map((p, i) => [p, pl[i + 1]] as [Point, Point]));
-  for (const h of hulls) cur = cur.flatMap(([a, b]) => clipOutside(a, b, h));
-  // rejoin consecutive segments
+/** The pieces of segment a-b that lie outside (the strictly inner part of) the convex polygon `h`. */
+function clipOutside(a: Point, b: Point, h: Point[]): Seg[] {
+  const span = insideSpan(a, b, h);
+  return span ? outsideSpan(a, b, span) : [[a, b]];
+}
+
+export const segments = (lines: Poly[]): Seg[] => lines.flatMap((pl) => pl.slice(0, -1).map((p, i) => [p, pl[i + 1]] as Seg));
+
+/** Joins consecutive segments that share an end into polylines. */
+export function rejoin(segs: Seg[]): Poly[] {
   const out: Poly[] = [];
-  for (const [a, b] of cur) {
+  for (const [a, b] of segs) {
     const last = out[out.length - 1];
     if (last && Math.hypot(last[last.length - 1][0] - a[0], last[last.length - 1][1] - a[1]) < 1e-6) last.push(b);
     else out.push([a, b]);
@@ -68,19 +81,32 @@ function clipPolylines(lines: Poly[], hulls: Point[][]): Poly[] {
   return out;
 }
 
+/** Remove the parts of polylines that fall inside any of the hulls. Open pieces are returned. */
+export function clipPolylines(lines: Poly[], hulls: Point[][]): Poly[] {
+  let cur = segments(lines);
+  for (const h of hulls) cur = cur.flatMap(([a, b]) => clipOutside(a, b, h));
+  return rejoin(cur);
+}
+
 // ---------------------------------------------------------------- one part
 
-type Built = { edges: Poly[]; silhouette: Point[]; construction: Primitive[]; top: number; name: string; detail: string };
+/** The isometric square (rhombus) of side `d` true mm that encloses a circle of diameter d, centred at paper height y on the axis. */
+export const rhombusAt = (d: number, k: number, y: number): Extract<Primitive, { t: "poly" }> => {
+  const side = d * k;
+  return { t: "poly", closed: true, pts: [[0, y - side * S30], [side * C30, y], [0, y + side * S30], [-side * C30, y]] };
+};
+
+export type Built = { edges: Poly[]; silhouette: Point[]; construction: Extract<Primitive, { t: "poly" }>[]; top: number; name: string; detail: string };
 
 const arc = (cx: number, cy: number, rx: number, ry: number, from: number, to: number, n = 48): Poly =>
   Array.from({ length: n + 1 }, (_, i) => ellipsePoint([cx, cy], rx, ry, 0, from + ((to - from) * i) / n));
 
-function buildPart(p: Part, z0: number, k: number): Built | string {
+export function buildPart(p: Part, z0: number, k: number): Built | string {
   const P = (x: number, y: number, z: number) => isoPoint(x, y, z, k);
   if (p.kind === "prism") {
     let base: Point[];
     if (p.base === "rectangle") {
-      if (!p.width) return "A rectangular prism needs both a length and a width.";
+      if (!p.width) return NEEDS_WIDTH;
       base = [[0, 0], [p.side, 0], [p.side, p.width], [0, p.width]];
     } else base = regularPolygon(SIDES[p.base], p.side);
     const cx = base.reduce((s, q) => s + q[0], 0) / base.length, cy = base.reduce((s, q) => s + q[1], 0) / base.length;
@@ -97,8 +123,7 @@ function buildPart(p: Part, z0: number, k: number): Built | string {
   }
   const D = p.diameter, r = D / 2;
   const rx = r * Math.sqrt(1.5) * k, ry = r * Math.sqrt(0.5) * k;
-  const side = D * k;
-  const rhombus = (z: number): Primitive => ({ t: "poly", closed: true, pts: [[0, z * k - side * S30], [side * C30, z * k], [0, z * k + side * S30], [-side * C30, z * k]] });
+  const rhombus = (z: number) => rhombusAt(D, k, z * k);
   if (p.kind === "cylinder") {
     const h = p.height, zb = z0 * k, zt = (z0 + h) * k;
     const edges: Poly[] = [arc(0, zb, rx, ry, 180, 360), arc(0, zt, rx, ry, 0, 360, 72), [[-rx, zb], [-rx, zt]], [[rx, zb], [rx, zt]]];
@@ -126,6 +151,27 @@ function buildPart(p: Part, z0: number, k: number): Built | string {
   return { edges: [arc(0, zb, rx, ry, 180, 360), dome], silhouette: hull([...dome, ...arc(0, zb, rx, ry, 180, 360)]), construction: [rhombus(z0)], top: z0 + r, name: `hemisphere (Ø${D} mm)`, detail: "hemisphere" };
 }
 
+/** True when every size of the part is a positive, finite number. */
+export const partOk = (p: Part) => Object.values(p).every((v) => typeof v !== "number" || (v > 0 && Number.isFinite(v)));
+
+/** Extent of a part's base in plan about its axis, [xmin, xmax, ymin, ymax] in mm, or an error message. */
+export function footprint(p: Part): [number, number, number, number] | string {
+  if (p.kind !== "prism") return [-p.diameter / 2, p.diameter / 2, -p.diameter / 2, p.diameter / 2];
+  if (p.base === "rectangle") return p.width ? [-p.side / 2, p.side / 2, -p.width / 2, p.width / 2] : NEEDS_WIDTH;
+  const q = regularPolygon(SIDES[p.base], p.side);
+  return [Math.min(...q.map((v) => v[0])), Math.max(...q.map((v) => v[0])), Math.min(...q.map((v) => v[1])), Math.max(...q.map((v) => v[1]))];
+}
+
+/** A part whose axis stands at plan position `at` (mm): the drawing of buildPart moved across the paper. A sphere's guide is the square on the ground it rests in. */
+export function buildPartAt(p: Part, at: Point, z0: number, k: number): Built | string {
+  const b = buildPart(p, z0, k);
+  if (typeof b === "string") return b;
+  if (p.kind === "sphere") b.construction = [rhombusAt(p.diameter, k, z0 * k)];
+  const [dx, dy] = isoPoint(at[0], at[1], 0, k);
+  const mv = (q: Point): Point => [q[0] + dx, q[1] + dy];
+  return { ...b, edges: b.edges.map((e) => e.map(mv)), silhouette: b.silhouette.map(mv), construction: b.construction.map((c) => ({ ...c, pts: c.pts.map(mv) })) };
+}
+
 /** Profile of (radius, height) for a stack of round parts, for the 3D viewer. */
 function revolveProfile(parts: Part[]): Point[] | null {
   if (parts.some((p) => p.kind === "prism")) return null;
@@ -149,6 +195,7 @@ const SHORT: Record<Part["kind"], string> = { prism: "prism", cylinder: "cylinde
 export function solveIsometricComposite(input: CompositeInput): Result {
   const { parts } = input;
   if (parts.length < 2 || parts.length > 4) return { ok: false, reason: "A composite solid needs 2 to 4 parts stacked one above the other." };
+  if (!parts.every(partOk)) return { ok: false, reason: "Every size must be a positive number." };
   const k = input.scale === "true" ? 1 : ISO_SCALE;
   for (let i = 0; i < parts.length - 1; i++) {
     if (["cone", "sphere", "hemisphere"].includes(parts[i].kind)) return { ok: false, reason: `A ${parts[i].kind} cannot carry another solid on top of it. Put it last (on top).` };
