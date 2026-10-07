@@ -5,7 +5,7 @@ import { solveCylinderPenetration } from "@/lib/geometry/penetration";
 import { solveIsometricComposite } from "@/lib/geometry/composite";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "@/lib/geometry/extra";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
-import { solveTilted } from "@/lib/geometry/tilt";
+import { solveTilted, solveTiltedVpFirst } from "@/lib/geometry/tilt";
 import type { Primitive, Solution } from "@/lib/schema";
 
 const ok = <T extends { ok: boolean }>(r: T) => {
@@ -298,5 +298,28 @@ describe("isometric composite solids", () => {
   it("only allows a cone, sphere or hemisphere on top", () => {
     expect(comp([{ kind: "cone", diameter: 40, height: 40 }, { kind: "cylinder", diameter: 30, height: 40 }]).ok).toBe(false);
     expect(comp([{ kind: "cylinder", diameter: 40, height: 30 }]).ok).toBe(false);
+  });
+});
+
+describe("planes inclined to the VP first", () => {
+  const vp = ok(solveTiltedVpFirst({ shape: "pentagon", size: 30, surfaceToVP: 45, sideToHP: 30, rest: "edge" }));
+  it("shows the true shape in the front view (above XY) and swaps the wording", () => {
+    const first = prims(vp, 0).filter((p) => p.t === "poly");
+    expect(first.length).toBe(1);
+    const pts = (first[0] as Extract<Primitive, { t: "poly" }>).pts;
+    expect(Math.min(...pts.map((q) => q[1]))).toBeGreaterThan(0);
+    expect(vp.problem).toMatch(/rests on the VP/);
+    expect(vp.problem).toMatch(/inclined at 45° to the VP/);
+    expect(vp.problem).toMatch(/30° to the HP/);
+    expect(vp.steps[0].title).toMatch(/front view/);
+    expect(JSON.stringify(vp)).not.toMatch(/top view in the simple/);
+  });
+  it("keeps the angles and puts the final top view below XY", () => {
+    const arc = prims(vp, 5).find((p) => p.t === "arc");
+    if (!arc || arc.t !== "arc") throw new Error();
+    expect(Math.abs(arc.to - arc.from)).toBeCloseTo(30, 4);
+    const last = prims(vp, 7).flatMap((p) => (p.t === "poly" ? p.pts : []));
+    expect(Math.min(...last.map((q) => q[1]))).toBeLessThan(-1e-6); // the top view is below XY
+    expect(Math.max(...ys(prims(vp, 5).filter((p) => p.t === "poly")))).toBeGreaterThan(0); // the turned front view is above
   });
 });

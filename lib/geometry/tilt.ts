@@ -434,3 +434,46 @@ export function solidFor(input: TiltInput): Solution["solid"] | undefined {
   const profile: Point[] = Array.from({ length: n }, (_, k) => [R * Math.cos((2 * Math.PI * k) / n), R * Math.sin((2 * Math.PI * k) / n)]);
   return input.solid === "prism" ? { kind: "extrude", profile, height: input.height } : { kind: "pyramid", profile, height: input.height };
 }
+
+// ---------------------------------------------------------------- VP first
+
+const SWAP: Record<string, string> = {
+  "top view": "front view", "front view": "top view", "top-view": "front-view", "front-view": "top-view",
+  "Top view": "Front view", "Front view": "Top view", "Top-view": "Front-view", "Front-view": "Top-view",
+  HP: "VP", VP: "HP", upward: "downward", downward: "upward", "projectors down": "projectors up", "projectors up": "projectors down",
+  height: "depth", depth: "height", heights: "depths", depths: "heights",
+};
+const swapWords = (s: string) => s.replace(/projectors (?:up|down)|\b(?:[Tt]op|[Ff]ront)[ -]view\b|\bHP\b|\bVP\b|\bupward\b|\bdownward\b|\b(?:height|depth)s?\b/g, (m) => SWAP[m] ?? m);
+
+const flip = (p: Primitive): Primitive => {
+  const f = (q: Point): Point => [q[0], -q[1]];
+  switch (p.t) {
+    case "line": return { ...p, a: f(p.a), b: f(p.b) };
+    case "circle": return { ...p, c: f(p.c) };
+    case "arc": return { ...p, c: f(p.c), from: -p.to, to: -p.from };
+    case "ellipse": return { ...p, c: f(p.c), rot: p.rot ? -p.rot : p.rot, ...(p.from !== undefined && p.to !== undefined ? { from: -p.to, to: -p.from } : {}) };
+    case "poly": return { ...p, pts: p.pts.map(f) };
+    case "text": return { ...p, at: f(p.at) };
+  }
+};
+
+/**
+ * A lamina placed with its surface inclined to the VP first (true shape in the front view), then a side inclined to the HP.
+ * Solved as the HP-first problem and then reflected in XY, which swaps the roles of the two planes.
+ * `surfaceToVP` is the inclination of the surface to the VP; `sideToHP` that of the side lying in the VP to the HP.
+ */
+export function solveTiltedVpFirst(input: { shape: RegularBase | "circle"; size: number; surfaceToVP: number; sideToHP?: number; rest: "corner" | "edge" }): Result {
+  const r = solveTilted({ shape: input.shape, size: input.size, angle: input.surfaceToVP, rest: input.rest, phi: input.sideToHP });
+  if (!r.ok) return r;
+  const s = r.solution;
+  return {
+    ok: true,
+    solution: {
+      ...s,
+      title: swapWords(s.title).replace("inclined to HP and VP", "inclined to VP and HP"),
+      problem: swapWords(s.problem),
+      givens: s.givens.map((g) => ({ name: swapWords(g.name), value: g.value })),
+      steps: s.steps.map((st) => ({ ...st, title: swapWords(st.title), explanation: swapWords(st.explanation), primitives: st.primitives.map(flip) })),
+    },
+  };
+}

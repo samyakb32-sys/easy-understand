@@ -5,7 +5,7 @@ import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDe
 import { solveIsometricCone, solveIsometricCylinder, solveIsometricPrism, solveIsometricSphere } from "./isometric";
 import { solveIsometricComposite } from "./composite";
 import { solveCylinderPenetration } from "./penetration";
-import { solveTilted } from "./tilt";
+import { solveTilted, solveTiltedVpFirst } from "./tilt";
 import { solveSectionPolyhedron, solveSectionRound } from "./sections";
 
 /**
@@ -103,6 +103,8 @@ export const Template = z.discriminatedUnion("template", [
     /** inclination to the VP of the side (or diameter) that lies in the HP, degrees. Leave out when only tilted to the HP. */
     phi: z.number().min(1).max(89).optional(),
     rest: z.enum(["corner", "edge"]).default("edge"),
+    /** "VP": the surface is inclined to the VP first (angle = surface to VP, phi = the side in the VP to the HP). Default "HP". */
+    first: z.enum(["HP", "VP"]).default("HP"),
   }),
 ]);
 export type Template = z.infer<typeof Template>;
@@ -159,6 +161,7 @@ export function solveTemplate(t: Template): SolveResult {
       if (!t.base) return { ok: false, reason: "Tell me the base shape (triangle, square, pentagon or hexagon)." };
       return solveTilted({ solid: t.solid, base: t.base, side: t.size, height: t.height, angle: t.angle, rest: t.rest, phi: t.phi });
     case "plane_inclined":
+      if (t.first === "VP") return solveTiltedVpFirst({ shape: t.shape, size: t.size, surfaceToVP: t.angle, sideToHP: t.phi, rest: t.rest });
       return solveTilted({ shape: t.shape, size: t.size, angle: t.angle, rest: t.rest, phi: t.phi });
   }
 }
