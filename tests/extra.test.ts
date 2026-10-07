@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { solveSectionRound } from "@/lib/geometry/sections";
+import { solveIsometricCone, solveIsometricSphere } from "@/lib/geometry/isometric";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "@/lib/geometry/extra";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
 import { solveTilted } from "@/lib/geometry/tilt";
@@ -204,5 +205,40 @@ describe("conic sections of a cone", () => {
   it("a cylinder cut through its base is a partial ellipse; two exits are refused", () => {
     expect(ok(solveSectionRound({ solid: "cylinder", diameter: 40, height: 70, angle: 40, axisHeight: 15 })).title).toBeTruthy();
     expect(solveSectionRound({ solid: "cylinder", diameter: 40, height: 40, angle: 60, axisHeight: 20 }).ok).toBe(false);
+  });
+});
+
+describe("isometric cone and sphere", () => {
+  it("cone: the apex lines are tangent to the base ellipse", () => {
+    const s = ok(solveIsometricCone({ diameter: 40, height: 60, scale: "isometric" }));
+    const k = Math.sqrt(2 / 3);
+    const rx = 20 * Math.sqrt(1.5) * k, ry = 20 * Math.sqrt(0.5) * k;
+    const tans = lines(prims(s, 3));
+    expect(tans).toHaveLength(2);
+    for (const l of tans) {
+      expect(l.a[0]).toBeCloseTo(0, 6);
+      expect(l.a[1]).toBeCloseTo(60 * k, 6);
+      const [x, y] = l.b;
+      expect((x / rx) ** 2 + (y / ry) ** 2).toBeCloseTo(1, 6); // on the ellipse
+      // tangent direction is perpendicular to the ellipse normal (x/rx^2, y/ry^2)
+      const d = [x - l.a[0], y - l.a[1]];
+      expect(d[0] * (x / rx ** 2) + d[1] * (y / ry ** 2)).toBeCloseTo(0, 6);
+    }
+  });
+  it("cone: refuses one too flat to draw", () => {
+    expect(solveIsometricCone({ diameter: 100, height: 5, scale: "isometric" }).ok).toBe(false);
+  });
+  it("sphere: radius is R with the isometric scale and 1.2247 R with true lengths", () => {
+    const c1 = prims(ok(solveIsometricSphere({ diameter: 50, scale: "isometric" })), 3)[0];
+    const c2 = prims(ok(solveIsometricSphere({ diameter: 50, scale: "true" })), 3)[0];
+    if (c1.t !== "circle" || c2.t !== "circle") throw new Error();
+    expect(c1.r).toBeCloseTo(25, 6);
+    expect(c2.r).toBeCloseTo(25 * Math.sqrt(1.5), 6);
+  });
+  it("hemisphere dome joins the ends of the face ellipse", () => {
+    const s = ok(solveIsometricSphere({ diameter: 50, scale: "isometric", hemisphere: true }));
+    const el = prims(s, 2)[0], arc = prims(s, 3)[0];
+    if (el.t !== "ellipse" || arc.t !== "arc") throw new Error();
+    expect(arc.r).toBeCloseTo(el.rx, 6);
   });
 });

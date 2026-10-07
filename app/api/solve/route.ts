@@ -31,6 +31,8 @@ Templates:
     isometric view of a prism standing on its base. "side" is the base side (for a rectangle it is the length and "width" is also required; leave "width" out otherwise).
     scale: "isometric" when the problem says isometric PROJECTION (uses the 0.816 isometric scale), "true" when it says isometric VIEW/DRAWING or gives true lengths.
 - {"template":"isometric_cylinder","diameter":number,"height":number,"scale":"isometric"|"true"}   isometric view of a cylinder with a vertical axis
+- {"template":"isometric_cone","diameter":number,"height":number,"scale":"isometric"|"true"}   isometric view of a cone standing on its base (same scale rule as the cylinder)
+- {"template":"isometric_sphere","diameter":number,"hemisphere":boolean,"scale":"isometric"|"true"}   isometric view of a sphere, or of a hemisphere with its flat face down when "hemisphere" is true. If given a radius, double it.
 - {"template":"section_polyhedron","solid":"prism"|"pyramid","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number,"angle":number,"axisHeight":number}
     a prism or pyramid standing on its base, cut by a plane perpendicular to the VP and inclined "angle" degrees to the HP (1 to 80), crossing the axis "axisHeight" mm above the base. Asks for the sectional top view and the true shape of the section.
 - {"template":"section_round","solid":"cylinder"|"cone","diameter":number,"height":number,"angle":number,"axisHeight":number,"axisOffset":number,"parallelToGenerator":boolean}

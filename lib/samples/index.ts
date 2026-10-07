@@ -1,5 +1,5 @@
 import type { Solution } from "../schema";
-import { solveIsometricCylinder, solveIsometricPrism } from "../geometry/isometric";
+import { solveIsometricCone, solveIsometricCylinder, solveIsometricPrism, solveIsometricSphere } from "../geometry/isometric";
 import { solveSectionPolyhedron, solveSectionRound } from "../geometry/sections";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "../geometry/extra";
 import { solveTilted } from "../geometry/tilt";
@@ -18,6 +18,9 @@ export const SAMPLES: Record<string, Solution> = {
   "prism-views": solvePrism(30, 50),
   "isometric-prism": mustSolve(solveIsometricPrism({ base: "hexagon", side: 25, height: 40, scale: "isometric" })),
   "isometric-cylinder": mustSolve(solveIsometricCylinder({ diameter: 40, height: 50, scale: "isometric" })),
+  "isometric-cone": mustSolve(solveIsometricCone({ diameter: 40, height: 60, scale: "isometric" })),
+  "isometric-sphere": mustSolve(solveIsometricSphere({ diameter: 50, scale: "isometric" })),
+  "isometric-hemisphere": mustSolve(solveIsometricSphere({ diameter: 50, scale: "isometric", hemisphere: true })),
   "section-pyramid": mustSolve(solveSectionPolyhedron({ solid: "pyramid", base: "square", side: 40, height: 60, angle: 30, axisHeight: 20 })),
   "section-prism": mustSolve(solveSectionPolyhedron({ solid: "prism", base: "hexagon", side: 25, height: 70, angle: 30, axisHeight: 35 })),
   "section-cone-parabola": mustSolve(solveSectionRound({ solid: "cone", diameter: 60, height: 70, angle: 0, axisHeight: 25, parallelToGenerator: true })),
@@ -47,6 +50,9 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "prism-views": "Views & 3D from 2D",
   "isometric-prism": "Isometric view",
   "isometric-cylinder": "Isometric view",
+  "isometric-cone": "Isometric view",
+  "isometric-sphere": "Isometric view",
+  "isometric-hemisphere": "Isometric view",
   "section-pyramid": "Sections of solids",
   "section-prism": "Sections of solids",
   "section-cone-parabola": "Sections of solids",

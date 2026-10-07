@@ -167,4 +167,116 @@ export function solveIsometricCylinder(i: IsoCylinderInput): { ok: true; solutio
   };
 }
 
+export type IsoConeInput = { diameter: number; height: number; scale: "isometric" | "true" };
+
+export function solveIsometricCone(i: IsoConeInput): { ok: true; solution: Solution } | { ok: false; reason: string } {
+  const k = i.scale === "true" ? 1 : ISO_SCALE;
+  const r = i.diameter / 2, h = i.height;
+  const rx = r * Math.sqrt(1.5) * k, ry = r * Math.sqrt(0.5) * k;
+  const H = h * k;
+  if (H <= ry + 1e-6) return { ok: false, reason: "This cone is too flat: its apex would fall inside the base ellipse in the isometric view." };
+  const side = i.diameter * k;
+  const rhombus: Extract<Primitive, { t: "poly" }> = { t: "poly", closed: true, pts: [[0, -side * S30], [side * C30, 0], [0, side * S30], [-side * C30, 0]] };
+  // tangents from the apex (0, H) touch the base ellipse at parametric angle t0 (and 180 - t0)
+  const t0 = (Math.asin(ry / H) * 180) / Math.PI;
+  const tp = (t: number): Point => ellipsePoint([0, 0], rx, ry, 0, t);
+  const apex: Point = [0, H];
+  const steps: Step[] = [
+    {
+      title: "Axis of the cone",
+      explanation: `Draw the vertical axis ${h} mm long (${round(H)} mm on the paper). The bottom end is the centre of the base and the top end is the apex. This drawing uses ${scaleName(k)}.`,
+      style: "construction",
+      primitives: [line([0, 0], apex, "centre"), text([2, H], "apex")],
+    },
+    {
+      title: "Isometric square round the base",
+      explanation: `A circle in an isometric plane becomes an ellipse. Enclose the base in an isometric square of side ${i.diameter} mm (${round(side)} mm on the paper): a rhombus centred on the base centre.`,
+      style: "construction",
+      primitives: [rhombus],
+    },
+    {
+      title: "Ellipse of the base",
+      explanation: `Draw the ellipse touching the midpoint of each side of the rhombus (four-centre method). Major axis ${round(2 * rx)} mm, minor axis ${round(2 * ry)} mm. Only the front half is firm for now.`,
+      style: "outline",
+      primitives: [{ t: "ellipse", c: [0, 0], rx, ry, from: 180, to: 360 }],
+    },
+    {
+      title: "Tangents from the apex",
+      explanation: "From the apex draw two lines tangent to the base ellipse. They touch it a little behind its widest points, so extend the firm arc to the points of contact. The cone is complete.",
+      style: "outline",
+      primitives: [line(apex, tp(t0)), line(apex, tp(180 - t0)), { t: "ellipse", c: [0, 0], rx, ry, from: 180 - t0, to: 180 }, { t: "ellipse", c: [0, 0], rx, ry, from: 360, to: 360 + t0 }],
+    },
+  ];
+  return {
+    ok: true,
+    solution: {
+      title: "Isometric view of a cone",
+      problem: `Draw the isometric ${i.scale === "true" ? "view" : "projection"} of a cone of base diameter ${i.diameter} mm and height ${h} mm, standing on its base.`,
+      givens: [
+        { name: "Base diameter", value: `${i.diameter} mm` },
+        { name: "Height", value: `${h} mm` },
+        { name: "Scale", value: i.scale === "true" ? "True (1:1)" : "Isometric (0.816)" },
+      ],
+      steps,
+      solid: { kind: "revolve", profile: [[0, 0], [r, 0], [0, h]] },
+    },
+  };
+}
+
+export type IsoSphereInput = { diameter: number; scale: "isometric" | "true"; hemisphere?: boolean };
+
+/** A sphere (or a hemisphere with its flat face down) in isometric. */
+export function solveIsometricSphere(i: IsoSphereInput): { ok: true; solution: Solution } {
+  const k = i.scale === "true" ? 1 : ISO_SCALE;
+  const r = i.diameter / 2;
+  const hemi = !!i.hemisphere;
+  const rs = (r * k) / ISO_SCALE; // radius of the circle that the sphere projects to
+  const rx = r * Math.sqrt(1.5) * k, ry = r * Math.sqrt(0.5) * k; // the equator / flat face
+  const cy = hemi ? 0 : rs; // centre height on the paper: a sphere rests on the ground, so it is rs above it... drawn about the centre
+  const side = i.diameter * k;
+  const rhombus = (y: number): Extract<Primitive, { t: "poly" }> => ({ t: "poly", closed: true, pts: [[0, y - side * S30], [side * C30, y], [0, y + side * S30], [-side * C30, y]] });
+  const name = hemi ? "hemisphere" : "sphere";
+  const steps: Step[] = [
+    {
+      title: hemi ? "Centre of the flat face" : "Centre of the sphere",
+      explanation: `Mark the centre O${hemi ? " of the flat face, which lies on the ground" : ""} and draw a short vertical axis through it. This drawing uses ${scaleName(k)}.`,
+      style: "construction",
+      primitives: [line([0, cy - (hemi ? 0 : rs) - 4], [0, cy + rs + 4], "centre"), text([2, cy + 2], "O")],
+    },
+    {
+      title: hemi ? "Isometric square round the flat face" : "Isometric square round the equator",
+      explanation: `The ${hemi ? "flat face" : "equator"} is a circle of diameter ${i.diameter} mm lying in a horizontal plane, so it appears as an ellipse. Enclose it in an isometric square of side ${i.diameter} mm (${round(side)} mm on the paper).`,
+      style: "construction",
+      primitives: [rhombus(cy)],
+    },
+    {
+      title: hemi ? "Ellipse of the flat face" : "Ellipse of the equator",
+      explanation: `Draw the ellipse inside the rhombus. Its major axis is ${round(2 * rx)} mm and its minor axis ${round(2 * ry)} mm.${hemi ? " Only the front half is visible." : " It is only a guide, so keep it thin."}`,
+      style: hemi ? "outline" : "construction",
+      primitives: [hemi ? { t: "ellipse", c: [0, cy], rx, ry, from: 180, to: 360 } : { t: "ellipse", c: [0, cy], rx, ry }],
+    },
+    {
+      title: hemi ? "Draw the dome" : "Draw the outline circle",
+      explanation: hemi
+        ? `With centre O and radius equal to half the major axis, ${round(rs)} mm, draw the upper half of a circle. It joins the ends of the ellipse. The hemisphere is complete.`
+        : `The sphere always looks like a circle. With centre O and radius equal to half the major axis, ${round(rs)} mm, draw it. ${i.scale === "isometric" ? "With the isometric scale this equals the true radius." : "With true lengths it is 1.225 times the true radius."}`,
+      style: "outline",
+      primitives: [hemi ? { t: "arc", c: [0, cy], r: rs, from: 0, to: 180 } : { t: "circle", c: [0, cy], r: rs }],
+    },
+  ];
+  const prof: Point[] = hemi
+    ? [[0, 0], [r, 0], ...Array.from({ length: 23 }, (_, m) => { const a = ((m + 1) * Math.PI) / 2 / 24; return [r * Math.cos(a), r * Math.sin(a)] as Point; }), [0, r]]
+    : [[0, 0], ...Array.from({ length: 23 }, (_, m) => { const a = (-Math.PI / 2) + ((m + 1) * Math.PI) / 24; return [r * Math.cos(a), r + r * Math.sin(a)] as Point; }), [0, 2 * r]];
+  return {
+    ok: true,
+    solution: {
+      title: `Isometric view of a ${name}`,
+      problem: `Draw the isometric ${i.scale === "true" ? "view" : "projection"} of a ${name} of diameter ${i.diameter} mm${hemi ? ", flat face on the ground" : ""}.`,
+      givens: [{ name: "Diameter", value: `${i.diameter} mm` }, { name: "Scale", value: i.scale === "true" ? "True (1:1)" : "Isometric (0.816)" }],
+      steps,
+      solid: { kind: "revolve", profile: prof },
+    },
+  };
+}
+
 export { ellipsePoint };

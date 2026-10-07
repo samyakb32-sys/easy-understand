@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Point, Primitive, Solution, Step } from "../schema";
 import { circleIntersections, lineProjection, pentagonOnBase, round } from "./basic";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "./extra";
-import { solveIsometricCylinder, solveIsometricPrism } from "./isometric";
+import { solveIsometricCone, solveIsometricCylinder, solveIsometricPrism, solveIsometricSphere } from "./isometric";
 import { solveTilted } from "./tilt";
 import { solveSectionPolyhedron, solveSectionRound } from "./sections";
 
@@ -54,6 +54,8 @@ export const Template = z.discriminatedUnion("template", [
     /** cone only: the plane is parallel to a generator (parabola); the angle is then worked out */
     parallelToGenerator: z.boolean().optional(),
   }),
+  z.object({ template: z.literal("isometric_cone"), diameter: z.number().positive(), height: z.number().positive(), scale: z.enum(["isometric", "true"]).default("isometric") }),
+  z.object({ template: z.literal("isometric_sphere"), diameter: z.number().positive(), hemisphere: z.boolean().optional(), scale: z.enum(["isometric", "true"]).default("isometric") }),
   z.object({ template: z.literal("conic"), distance: z.number().positive(), eccentricity: z.number().positive() }),
   z.object({ template: z.literal("development_cone"), diameter: z.number().positive(), height: z.number().positive() }),
   z.object({ template: z.literal("development_pyramid"), base: z.enum(["triangle", "square", "pentagon", "hexagon"]), side: z.number().positive(), height: z.number().positive() }),
@@ -116,6 +118,10 @@ export function solveTemplate(t: Template): SolveResult {
       return solveSectionPolyhedron(t);
     case "section_round":
       return solveSectionRound(t);
+    case "isometric_cone":
+      return solveIsometricCone(t);
+    case "isometric_sphere":
+      return { ok: true, solution: solveIsometricSphere(t).solution };
     case "conic":
       return solveConic(t.distance, t.eccentricity);
     case "development_cone":

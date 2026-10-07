@@ -52,4 +52,4 @@ Sign-in and the database use **Supabase**; payments use **Razorpay**. Nothing he
 
 ## Not done yet
 
-Refund/invoice tooling (refunds are done from the Razorpay dashboard), an admin view, GST invoices, the OpenCV/OCR pre-processing step, and some problem types (planes and solids inclined to both HP and VP, which need the second tilt; isometric of cones, spheres and composite solids; interpenetration of solids).
+Refund/invoice tooling (refunds are done from the Razorpay dashboard), an admin view, GST invoices, the OpenCV/OCR pre-processing step, and some problem types (planes and solids inclined to both HP and VP, which need the second tilt; isometric of composite solids; interpenetration of solids).
