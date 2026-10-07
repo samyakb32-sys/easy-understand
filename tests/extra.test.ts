@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { solveSectionRound } from "@/lib/geometry/sections";
 import { solveIsometricCone, solveIsometricSphere } from "@/lib/geometry/isometric";
 import { solveCylinderPenetration } from "@/lib/geometry/penetration";
+import { solveIsometricComposite } from "@/lib/geometry/composite";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "@/lib/geometry/extra";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
 import { solveTilted } from "@/lib/geometry/tilt";
@@ -271,5 +272,31 @@ describe("interpenetration of cylinders", () => {
   it("rejects a branch that is bigger or does not fit", () => {
     expect(solveCylinderPenetration({ mainDiameter: 40, mainHeight: 80, branchDiameter: 50 }).ok).toBe(false);
     expect(solveCylinderPenetration({ mainDiameter: 60, mainHeight: 80, branchDiameter: 40, axisHeight: 10 }).ok).toBe(false);
+  });
+});
+
+describe("isometric composite solids", () => {
+  const comp = (parts: Parameters<typeof solveIsometricComposite>[0]["parts"]) => solveIsometricComposite({ scale: "isometric", parts });
+  it("builds 1 + 2 steps per part and a 3D profile for round stacks", () => {
+    const s = ok(comp([{ kind: "cylinder", diameter: 50, height: 30 }, { kind: "cone", diameter: 40, height: 40 }]));
+    expect(s.steps).toHaveLength(5);
+    expect(s.solid?.kind).toBe("revolve");
+    expect(ok(comp([{ kind: "prism", base: "square", side: 50, height: 20 }, { kind: "cylinder", diameter: 30, height: 40 }])).solid).toBeUndefined();
+  });
+  it("leaves out the lower top-face lines that the upper solid hides, and nothing else", () => {
+    const k = Math.sqrt(2 / 3);
+    const s = ok(comp([{ kind: "prism", base: "square", side: 50, height: 20 }, { kind: "cylinder", diameter: 30, height: 40 }]));
+    const pts = prims(s, 2).flatMap((p) => (p.t === "poly" ? p.pts : []));
+    // nothing of the slab's top outline lies strictly inside the cylinder's silhouette
+    const rx = 15 * Math.sqrt(1.5) * k;
+    const top = 20 * k;
+    const inside = pts.filter(([x, y]) => Math.abs(x) < rx - 0.01 && y > top + 0.01 && y < top + 40 * k - 0.01);
+    expect(inside).toHaveLength(0);
+    // the visible front corner and both side corners of the slab top are still drawn
+    expect(pts.some(([x, y]) => Math.abs(x) < 1e-6 && Math.abs(y - (top - 25 * 2 * 0.5 * k)) < 1e-6)).toBe(true);
+  });
+  it("only allows a cone, sphere or hemisphere on top", () => {
+    expect(comp([{ kind: "cone", diameter: 40, height: 40 }, { kind: "cylinder", diameter: 30, height: 40 }]).ok).toBe(false);
+    expect(comp([{ kind: "cylinder", diameter: 40, height: 30 }]).ok).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import type { Solution } from "../schema";
 import { solveIsometricCone, solveIsometricCylinder, solveIsometricPrism, solveIsometricSphere } from "../geometry/isometric";
 import { solveSectionPolyhedron, solveSectionRound } from "../geometry/sections";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "../geometry/extra";
+import { solveIsometricComposite } from "../geometry/composite";
 import { solveCylinderPenetration } from "../geometry/penetration";
 import { solveTilted } from "../geometry/tilt";
 import { solveCylinder, solveLineProjection, solvePentagon, solvePrism } from "../geometry/solvers";
@@ -22,6 +23,9 @@ export const SAMPLES: Record<string, Solution> = {
   "isometric-cone": mustSolve(solveIsometricCone({ diameter: 40, height: 60, scale: "isometric" })),
   "isometric-sphere": mustSolve(solveIsometricSphere({ diameter: 50, scale: "isometric" })),
   "isometric-hemisphere": mustSolve(solveIsometricSphere({ diameter: 50, scale: "isometric", hemisphere: true })),
+  "isometric-cone-on-cylinder": mustSolve(solveIsometricComposite({ scale: "isometric", parts: [{ kind: "cylinder", diameter: 50, height: 30 }, { kind: "cone", diameter: 40, height: 40 }] })),
+  "isometric-cylinder-on-square": mustSolve(solveIsometricComposite({ scale: "isometric", parts: [{ kind: "prism", base: "square", side: 50, height: 20 }, { kind: "cylinder", diameter: 30, height: 40 }] })),
+  "isometric-hemisphere-on-prism": mustSolve(solveIsometricComposite({ scale: "isometric", parts: [{ kind: "prism", base: "hexagon", side: 25, height: 30 }, { kind: "hemisphere", diameter: 40 }] })),
   "section-pyramid": mustSolve(solveSectionPolyhedron({ solid: "pyramid", base: "square", side: 40, height: 60, angle: 30, axisHeight: 20 })),
   "section-prism": mustSolve(solveSectionPolyhedron({ solid: "prism", base: "hexagon", side: 25, height: 70, angle: 30, axisHeight: 35 })),
   "section-cone-parabola": mustSolve(solveSectionRound({ solid: "cone", diameter: 60, height: 70, angle: 0, axisHeight: 25, parallelToGenerator: true })),
@@ -56,6 +60,9 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "isometric-cone": "Isometric view",
   "isometric-sphere": "Isometric view",
   "isometric-hemisphere": "Isometric view",
+  "isometric-cone-on-cylinder": "Isometric view",
+  "isometric-cylinder-on-square": "Isometric view",
+  "isometric-hemisphere-on-prism": "Isometric view",
   "section-pyramid": "Sections of solids",
   "section-prism": "Sections of solids",
   "section-cone-parabola": "Sections of solids",
