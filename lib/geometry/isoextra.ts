@@ -266,7 +266,7 @@ const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 /**
  * The parts of 3D segment a-b that no face in front of it covers. Only faces turned towards the viewer can hide anything, because for a closed
- * solid every ray meets a front-turned face first. A face hides the part of the edge that lies inside its outline on the paper and behind it.
+ * solid every ray meets a front-turned face first. A face hides the part of the edge that lies inside its outline (boundary included, so the seam between two coplanar halves of one face hides it too) on the paper and behind it.
  */
 export function visibleParts(a: V3, b: V3, faces: Face[], k: number): Seg[] {
   const P = (v: V3) => isoPoint(v[0], v[1], v[2], k);
@@ -277,7 +277,7 @@ export function visibleParts(a: V3, b: V3, faces: Face[], k: number): Seg[] {
     if (dn <= 1e-9) continue;
     const outline = f.pts.map(P);
     const area = outline.reduce((s, p, j) => s + p[0] * outline[(j + 1) % outline.length][1] - outline[(j + 1) % outline.length][0] * p[1], 0);
-    const span = insideSpan(a2, b2, area > 0 ? outline : outline.reverse());
+    const span = insideSpan(a2, b2, area > 0 ? outline : outline.reverse(), -1e-6);
     if (!span) continue;
     const c = dot(f.n, f.pts[0]);
     const gap = (v: V3) => (c - dot(f.n, v)) / dn - 1e-6; // how far in front of the point the face's plane lies

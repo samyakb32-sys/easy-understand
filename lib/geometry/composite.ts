@@ -25,21 +25,26 @@ const NEEDS_WIDTH = "A rectangular prism needs both a length and a width.";
 type Poly = Point[];
 const cross = (o: Point, a: Point, b: Point) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
 
-/** Convex hull, counter-clockwise. */
+/** Convex hull, counter-clockwise, without repeated points (a closed ring ends where it starts, up to rounding). */
 export function hull(pts: Point[]): Point[] {
   const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const lower: Point[] = [], upper: Point[] = [];
   for (const q of p) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q); }
   for (const q of [...p].reverse()) { while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop(); upper.push(q); }
-  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  const ring = [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  return ring.filter((q, i) => Math.hypot(q[0] - ring[(i + 1) % ring.length][0], q[1] - ring[(i + 1) % ring.length][1]) > 1e-9);
 }
 
-/** The part [t0, t1] of segment a-b (as fractions of its length) that lies strictly inside the convex counter-clockwise polygon `h`, or null. */
-export function insideSpan(a: Point, b: Point, h: Point[]): [number, number] | null {
-  const EPS = 1e-6;
+/**
+ * The part [t0, t1] of segment a-b (as fractions of its length) that lies strictly inside the convex counter-clockwise polygon `h`, or null.
+ * A negative `margin` takes the closed polygon instead, so that a segment along its boundary counts as inside.
+ */
+export function insideSpan(a: Point, b: Point, h: Point[], margin = 1e-6): [number, number] | null {
+  const EPS = margin;
   let t0 = 0, t1 = 1;
   for (let i = 0; i < h.length; i++) {
     const p = h[i], q = h[(i + 1) % h.length];
+    if (Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-9) continue;
     const fa = cross(p, q, a) - EPS * Math.hypot(q[0] - p[0], q[1] - p[1]);
     const fb = cross(p, q, b) - EPS * Math.hypot(q[0] - p[0], q[1] - p[1]);
     if (fa <= 0 && fb <= 0) return null; // wholly outside this edge's half-plane

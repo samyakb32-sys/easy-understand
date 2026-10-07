@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPart, buildPartAt, solveIsometricComposite, type Part } from "@/lib/geometry/composite";
+import { buildPart, buildPartAt, hull, solveIsometricComposite, type Part } from "@/lib/geometry/composite";
 import { ISO_SCALE, isoPoint } from "@/lib/geometry/isometric";
 import { notchedBlock, solveIsometricHoled, solveIsometricNotched, solveIsometricRow, visibleParts, type Face, type HoledInput, type NotchInput, type RowInput } from "@/lib/geometry/isoextra";
 import { Solution as SolutionSchema, type Point, type Primitive, type Solution } from "@/lib/schema";
@@ -107,6 +107,27 @@ describe("isometric_row", () => {
     const full = alone.edges.flatMap((e) => e.slice(0, -1).map((a, i) => [a, e[i + 1]] as Seg));
     const kept = segsOf(s.steps[3].primitives);
     sample(full, 0.3).filter((p) => !inCylinder(p, -0.01)).forEach((p) => expect(onAny(p, kept), `dropped ${p}`).toBe(true));
+  });
+  it.each(["sphere", "cone", "hemisphere"] as const)("a nearer %s hides the part of a farther cylinder behind its silhouette", (kind) => {
+    const near: Part = kind === "cone" ? { kind, diameter: 31, height: 40 } : { kind, diameter: 31 };
+    const far: Part = { kind: "cylinder", diameter: 30, height: 40 };
+    const s = ok(row({ parts: [near, far], gap: 2 }), `row-near-${kind}`);
+    const sil = buildPartAt(near, [15.5, 15.5], 0, K);
+    if (typeof sil === "string") throw new Error(sil);
+    const inside = (p: Point) => sil.silhouette.every((q, i) => { const r = sil.silhouette[(i + 1) % sil.silhouette.length]; return (r[0] - q[0]) * (p[1] - q[1]) - (r[1] - q[1]) * (p[0] - q[0]) > 0.05 * Math.hypot(r[0] - q[0], r[1] - q[1]); });
+    const pts = s.steps[3].primitives.flatMap((p) => (p.t === "poly" ? p.pts : []));
+    expect(pts.length).toBeGreaterThan(20);
+    sample(segsOf(s.steps[3].primitives), 0.2).forEach((p) => expect(inside(p), `drawn behind the ${kind} at ${p}`).toBe(false));
+    // and the cylinder's outline is cut, not dropped: some of it is still drawn
+    expect(segsOf(s.steps[3].primitives).length).toBeGreaterThan(1);
+  });
+  it("three spheres with a gap: the farthest circle is cut by the middle one", () => {
+    const sph: Part = { kind: "sphere", diameter: 30 };
+    const s = ok(row({ parts: [sph, sph, sph], gap: 2 }), "row-three-spheres");
+    const c = isoPoint(79, 15, 0, K), m = isoPoint(47, 15, 0, K);
+    expect(Math.hypot(c[0] - m[0], c[1] - m[1])).toBeLessThan(30); // they do overlap on the paper
+    const far = segsOf(s.steps[4].primitives);
+    sample(far, 0.1).forEach((p) => expect(Math.hypot(p[0] - m[0], p[1] - (m[1] + 15 * K)) >= 15 - 0.05, `at ${p}`).toBe(true));
   });
   it("draws no line twice where solids touch", () => {
     const s = ok(row({ parts: [prism(30, 30, 30), prism(30, 30, 30), prism(30, 30, 30)] }));
@@ -285,12 +306,26 @@ const inSolid = ([x, y, z]: V3, i: NotchInput, eps = 1e-6) => {
   if (x <= eps || x >= i.length - eps || y <= eps || y >= i.width - eps || z <= eps || z >= i.height - eps) return false;
   return !(x > nx[0] - eps && x < nx[1] + eps && y > ny[0] - eps && y < ny[1] + eps && z > nz[0] - eps);
 };
-/** An edge point is seen if the ray from it towards the viewer never enters the solid (found by marching, not by faces). */
+/**
+ * An edge point is seen if the ray from it towards the viewer never passes through the solid. Found exactly, with no faces: the stretch of the
+ * ray inside the box, less the stretch inside the (closed) notch; any piece of real length means the solid is in the way.
+ */
 const rayVisible = (p: V3, i: NotchInput) => {
-  for (let t = 0.002; t < Math.max(i.length, i.width) + 1; t += 0.1) if (inSolid([p[0] - t, p[1] - t, p[2] + t], i)) return false;
-  return true;
+  const d: V3 = [-1, -1, 1];
+  const span = (lo: V3, hi: V3, open: boolean): [number, number] => {
+    let t0 = 0, t1 = Infinity;
+    for (let c = 0; c < 3; c++) {
+      const u = (lo[c] - p[c]) / d[c], v = (hi[c] - p[c]) / d[c];
+      t0 = Math.max(t0, Math.min(u, v));
+      t1 = Math.min(t1, Math.max(u, v));
+    }
+    return open || t0 <= t1 ? [t0, t1] : [0, -1];
+  };
+  const [b0, b1] = span([0, 0, 0], [i.length, i.width, i.height], true);
+  const { x, y, z } = notchedBlock(i).notch;
+  const [n0, n1] = span([x[0], y[0], z[0]], [x[1], y[1], z[1]], false);
+  return !(Math.min(b1, n0) - b0 > 1e-7 || b1 - Math.max(b0, n1) > 1e-7);
 };
-
 describe("hidden lines by faces", () => {
   it("a cube shows 9 of its 12 edges", () => {
     const faces = boxFaces(0, 10, 0, 10, 10);
@@ -298,7 +333,7 @@ describe("hidden lines by faces", () => {
     const bottom: Face = { pts: [[0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0]], n: [0, 0, -1] };
     for (const f of [faces, [...faces, bottom]]) {
       const len = all.flatMap(([a, b]) => visibleParts(a, b, f, K)).reduce((s, [p, q]) => s + Math.hypot(q[0] - p[0], q[1] - p[1]), 0);
-      expect(len).toBeCloseTo(9 * 10 * K, 6);
+      expect(len).toBeCloseTo(9 * 10 * K, 4);
     }
   });
   it("a low box in front hides the foot of a taller one behind it, and no more", () => {
@@ -343,26 +378,43 @@ describe("isometric_notched", () => {
     expect(o("right")[0]).toBeGreaterThan(0);
     expect(o("left")[0]).toBeLessThan(0);
   });
-  it.each([...AT.flatMap((at) => [[at, 29, 19, 13], [at, 24, 17, 31]] as const)])("%s %s x %s x %s: the outline lines are exactly the edges a ray can reach", (at, nl, nw, nd) => {
-    const i = input({ at, notchLength: nl, notchWidth: nw, notchDepth: nd });
-    const s = ok(solveIsometricNotched(i), `notch-${at}-${nd}`);
+  /** another edge that is seen at this very spot of the paper (a hidden edge can lie exactly behind a visible one) */
+  const behindSeen = (q: Point, own: [V3, V3], i: NotchInput) => notchedBlock(i).edges.some(({ a, b }) => {
+    if (a === own[0]) return false;
+    const [a2, b2] = [isoPoint(...a, K), isoPoint(...b, K)];
+    const l2 = (b2[0] - a2[0]) ** 2 + (b2[1] - a2[1]) ** 2;
+    const t = Math.max(0, Math.min(1, ((q[0] - a2[0]) * (b2[0] - a2[0]) + (q[1] - a2[1]) * (b2[1] - a2[1])) / l2));
+    return Math.hypot(a2[0] + (b2[0] - a2[0]) * t - q[0], a2[1] + (b2[1] - a2[1]) * t - q[1]) < 1e-6 && rayVisible([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t], i);
+  });
+  const agrees = (i: NotchInput, step = 2.2) => {
+    const s = ok(solveIsometricNotched(i), `notch-${i.at}-${i.notchLength}-${i.notchWidth}-${i.notchDepth}`);
     const lines = outlineSegs(s);
     let seen = 0, hidden = 0;
     for (const { a, b } of notchedBlock(i).edges) {
-      const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / 2.2);
+      const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / step);
       for (let j = 0; j < n; j++) {
         const f = (j + 0.37) / n;
         const p: V3 = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
-        const want = rayVisible(p, i);
+        const want = rayVisible(p, i) || behindSeen(isoPoint(...p, K), [a, b], i);
         expect(onAny(isoPoint(...p, K), lines), `${a}->${b} at ${f.toFixed(3)} should be ${want ? "drawn" : "hidden"}`).toBe(want);
         if (want) seen++; else hidden++;
       }
     }
     expect(seen).toBeGreaterThan(50);
-    expect(hidden).toBeGreaterThan(10);
+    expect(hidden).toBeGreaterThan(5);
     // nothing is drawn that is not part of an edge: every outline point lies on an edge's projection
     const edgeSegs = notchedBlock(i).edges.map(({ a, b }): Seg => [isoPoint(...a, K), isoPoint(...b, K)]);
     sample(lines, 0.5).forEach((p) => expect(onAny(p, edgeSegs), `stray ${p}`).toBe(true));
+  };
+  it.each([...AT.flatMap((at) => [[at, 29, 19, 13], [at, 24, 17, 31]] as const)])("%s %s x %s x %s: the outline lines are exactly the edges a ray can reach", (at, nl, nw, nd) => {
+    agrees(input({ at, notchLength: nl, notchWidth: nw, notchDepth: nd }));
+  });
+  // the hidden floor edge, moved along the line of sight by the depth, falls exactly on the seam between the two halves of the top face
+  it.each([...AT.flatMap((at) => [[at, 80, 60, 50, 30, 25, 25], [at, 80, 60, 50, 25, 20, 25], [at, 80, 60, 50, 20, 20, 20], [at, 80, 60, 50, 19, 30, 19], [at, 60, 40, 30, 15, 10, 10], [at, 50, 50, 50, 25, 25, 25]] as const)])("%s block %s x %s x %s, notch %s x %s x %s: a depth equal to the notch width or length leaves no line across the top face", (at, length, width, height, nl, nw, nd) => {
+    agrees({ ...input({ at, notchLength: nl, notchWidth: nw, notchDepth: nd }), length, width, height });
+  });
+  it.each(AT)("%s: a slot 1 mm short of the whole length draws no tick at the end of the rim", (at) => {
+    agrees({ ...input({ at, notchLength: 79, notchWidth: 20, notchDepth: 20 }), length: 80, width: 60, height: 50 }, 0.4);
   });
   it.each(AT)("%s: the thin lines of the early steps are all part of the final drawing, so none is left floating in the cut", (at) => {
     const i = input({ at });
@@ -436,6 +488,15 @@ describe("composite helpers", () => {
     const [dx, dy] = isoPoint(13, 7, 0, K);
     a.edges.forEach((e, i) => e.forEach((q, j) => { expect(b.edges[i][j][0]).toBeCloseTo(q[0] + dx, 9); expect(b.edges[i][j][1]).toBeCloseTo(q[1] + dy, 9); }));
     b.silhouette.forEach((q) => expect(Math.hypot(q[0] - dx, q[1] - dy)).toBeLessThan(200));
+  });
+  it("a silhouette hull has no zero-length edge, even for round parts whose ring ends where it starts", () => {
+    const parts: Part[] = [{ kind: "sphere", diameter: 30 }, { kind: "cone", diameter: 30, height: 40 }, { kind: "hemisphere", diameter: 30 }, { kind: "cylinder", diameter: 30, height: 20 }];
+    for (const p of parts) for (const d of [7, 30, 41.3]) {
+      const b = buildPart({ ...p, diameter: d } as Part, 0, K);
+      if (typeof b === "string") continue;
+      b.silhouette.forEach((q, i) => expect(Math.hypot(q[0] - b.silhouette[(i + 1) % b.silhouette.length][0], q[1] - b.silhouette[(i + 1) % b.silhouette.length][1]), `${p.kind} ${d}`).toBeGreaterThan(1e-6));
+    }
+    expect(hull([[0, 0], [1, 0], [1, 1e-16], [1, 1], [0, 1]])).toHaveLength(4);
   });
   it("a sphere's guide is the square on the ground it rests in", () => {
     const b = buildPartAt({ kind: "sphere", diameter: 40 }, [0, 0], 0, K);

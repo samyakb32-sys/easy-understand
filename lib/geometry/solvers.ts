@@ -5,6 +5,8 @@ import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDe
 import { solveIsometricCone, solveIsometricCylinder, solveIsometricPrism, solveIsometricSphere } from "./isometric";
 import { solveIsometricComposite } from "./composite";
 import { solveCylinderPenetration } from "./penetration";
+import { solveIsometricHoled, solveIsometricNotched, solveIsometricRow } from "./isoextra";
+import { solveConeCylinder, solveOffsetCylinders, solvePrismCylinder } from "./penetration2";
 import { solveSolidVpFirst, solveTilted, solveTiltedVpFirst } from "./tilt";
 import { solveSectionPolyhedron, solveSectionRound } from "./sections";
 
@@ -76,6 +78,60 @@ export const Template = z.discriminatedUnion("template", [
       .max(4),
     scale: z.enum(["isometric", "true"]).default("isometric"),
   }),
+  z.object({
+    template: z.literal("isometric_row"),
+    /** 2 or 3 solids on the ground side by side, in order along the row starting from the end nearest the viewer */
+    parts: z
+      .array(
+        z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("prism"), base: z.enum(["rectangle", "triangle", "square", "pentagon", "hexagon"]), side: z.number().positive(), width: z.number().positive().optional(), height: z.number().positive() }),
+          z.object({ kind: z.literal("cylinder"), diameter: z.number().positive(), height: z.number().positive() }),
+          z.object({ kind: z.literal("cone"), diameter: z.number().positive(), height: z.number().positive() }),
+          z.object({ kind: z.literal("sphere"), diameter: z.number().positive() }),
+          z.object({ kind: z.literal("hemisphere"), diameter: z.number().positive() }),
+        ]),
+      )
+      .min(2)
+      .max(3),
+    /** gap between neighbouring solids, mm; 0 = touching */
+    gap: z.number().min(0).default(0),
+    /** the isometric axis the row runs along: x runs up and to the right, y up and to the left */
+    along: z.enum(["x", "y"]).default("x"),
+    scale: z.enum(["isometric", "true"]).default("isometric"),
+  }),
+  z.object({
+    template: z.literal("isometric_holed"),
+    solid: z.enum(["prism", "cylinder"]),
+    base: z.enum(["rectangle", "triangle", "square", "pentagon", "hexagon"]).optional(),
+    /** base side (prism; the length of a rectangle) */
+    side: z.number().positive().optional(),
+    /** rectangular base only */
+    width: z.number().positive().optional(),
+    /** cylinder only */
+    diameter: z.number().positive().optional(),
+    height: z.number().positive(),
+    holeDiameter: z.number().positive(),
+    /** omit for a through hole */
+    holeDepth: z.number().positive().optional(),
+    scale: z.enum(["isometric", "true"]).default("isometric"),
+  }),
+  z.object({
+    template: z.literal("isometric_notched"),
+    /** along the axis that runs up and to the right */
+    length: z.number().positive(),
+    /** along the axis that runs up and to the left */
+    width: z.number().positive(),
+    height: z.number().positive(),
+    notchLength: z.number().positive(),
+    notchWidth: z.number().positive(),
+    notchDepth: z.number().positive(),
+    /** which top corner is cut, as the viewer sees the isometric block */
+    at: z.enum(["front", "back", "left", "right"]),
+    scale: z.enum(["isometric", "true"]).default("isometric"),
+  }),
+  z.object({ template: z.literal("interpenetration_cylinders_offset"), mainDiameter: z.number().positive(), mainHeight: z.number().positive(), branchDiameter: z.number().positive(), offset: z.number(), axisHeight: z.number().min(0).optional() }),
+  z.object({ template: z.literal("interpenetration_cone_cylinder"), coneDiameter: z.number().positive(), coneHeight: z.number().positive(), branchDiameter: z.number().positive(), axisHeight: z.number().positive() }),
+  z.object({ template: z.literal("interpenetration_prism_cylinder"), side: z.number().positive(), height: z.number().positive(), branchDiameter: z.number().positive(), axisHeight: z.number().min(0).optional(), facesInclined: z.boolean().optional() }),
   z.object({ template: z.literal("conic"), distance: z.number().positive(), eccentricity: z.number().positive() }),
   z.object({ template: z.literal("development_cone"), diameter: z.number().positive(), height: z.number().positive() }),
   z.object({ template: z.literal("development_pyramid"), base: z.enum(["triangle", "square", "pentagon", "hexagon"]), side: z.number().positive(), height: z.number().positive() }),
@@ -150,6 +206,18 @@ export function solveTemplate(t: Template): SolveResult {
       return solveCylinderPenetration(t);
     case "isometric_composite":
       return solveIsometricComposite(t);
+    case "isometric_row":
+      return solveIsometricRow(t);
+    case "isometric_holed":
+      return solveIsometricHoled(t);
+    case "isometric_notched":
+      return solveIsometricNotched(t);
+    case "interpenetration_cylinders_offset":
+      return solveOffsetCylinders(t);
+    case "interpenetration_cone_cylinder":
+      return solveConeCylinder(t);
+    case "interpenetration_prism_cylinder":
+      return solvePrismCylinder(t);
     case "conic":
       return solveConic(t.distance, t.eccentricity);
     case "development_cone":

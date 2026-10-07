@@ -4,6 +4,8 @@ import { solveSectionPolyhedron, solveSectionRound } from "../geometry/sections"
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "../geometry/extra";
 import { solveIsometricComposite } from "../geometry/composite";
 import { solveCylinderPenetration } from "../geometry/penetration";
+import { solveIsometricHoled, solveIsometricNotched, solveIsometricRow } from "../geometry/isoextra";
+import { solveConeCylinder, solveOffsetCylinders, solvePrismCylinder } from "../geometry/penetration2";
 import { solveSolidVpFirst, solveTilted, solveTiltedVpFirst } from "../geometry/tilt";
 import { solveCylinder, solveLineProjection, solvePentagon, solvePrism } from "../geometry/solvers";
 
@@ -33,6 +35,13 @@ export const SAMPLES: Record<string, Solution> = {
   "section-cylinder": mustSolve(solveSectionRound({ solid: "cylinder", diameter: 40, height: 70, angle: 30, axisHeight: 35 })),
   "penetration-cylinders": mustSolve(solveCylinderPenetration({ mainDiameter: 60, mainHeight: 80, branchDiameter: 40 })),
   "penetration-equal": mustSolve(solveCylinderPenetration({ mainDiameter: 40, mainHeight: 70, branchDiameter: 40 })),
+  "isometric-row": mustSolve(solveIsometricRow({ parts: [{ kind: "prism", base: "square", side: 40, height: 30 }, { kind: "cylinder", diameter: 30, height: 50 }, { kind: "sphere", diameter: 40 }], gap: 0, along: "x", scale: "isometric" })),
+  "isometric-holed": mustSolve(solveIsometricHoled({ solid: "prism", base: "hexagon", side: 30, height: 40, holeDiameter: 30, holeDepth: 15, scale: "isometric" })),
+  "isometric-holed-cylinder": mustSolve(solveIsometricHoled({ solid: "cylinder", diameter: 60, height: 20, holeDiameter: 30, scale: "isometric" })),
+  "isometric-notched": mustSolve(solveIsometricNotched({ length: 70, width: 50, height: 40, notchLength: 30, notchWidth: 20, notchDepth: 15, at: "front", scale: "isometric" })),
+  "penetration-offset": mustSolve(solveOffsetCylinders({ mainDiameter: 70, mainHeight: 90, branchDiameter: 40, offset: 12 })),
+  "penetration-cone": mustSolve(solveConeCylinder({ coneDiameter: 80, coneHeight: 90, branchDiameter: 30, axisHeight: 35 })),
+  "penetration-prism": mustSolve(solvePrismCylinder({ side: 60, height: 80, branchDiameter: 40, facesInclined: true })),
   "ellipse-eccentricity": mustSolve(solveConic(50, 2 / 3)),
   "parabola-eccentricity": mustSolve(solveConic(40, 1)),
   "hyperbola-eccentricity": mustSolve(solveConic(40, 3 / 2)),
@@ -74,6 +83,13 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "section-cylinder": "Sections of solids",
   "penetration-cylinders": "Interpenetration of solids",
   "penetration-equal": "Interpenetration of solids",
+  "isometric-row": "Isometric view",
+  "isometric-holed": "Isometric view",
+  "isometric-holed-cylinder": "Isometric view",
+  "isometric-notched": "Isometric view",
+  "penetration-offset": "Interpenetration of solids",
+  "penetration-cone": "Interpenetration of solids",
+  "penetration-prism": "Interpenetration of solids",
   "ellipse-eccentricity": "Engineering curves",
   "parabola-eccentricity": "Engineering curves",
   "hyperbola-eccentricity": "Engineering curves",
