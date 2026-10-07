@@ -47,8 +47,12 @@ export const Template = z.discriminatedUnion("template", [
     solid: z.enum(["cylinder", "cone"]),
     diameter: z.number().positive(),
     height: z.number().positive(),
-    angle: z.number().min(1).max(80),
+    angle: z.number().min(1).max(89),
     axisHeight: z.number().min(0),
+    /** where the plane crosses that height, mm right (+) or left (-) of the axis; 0 = through the axis */
+    axisOffset: z.number().optional(),
+    /** cone only: the plane is parallel to a generator (parabola); the angle is then worked out */
+    parallelToGenerator: z.boolean().optional(),
   }),
   z.object({ template: z.literal("conic"), distance: z.number().positive(), eccentricity: z.number().positive() }),
   z.object({ template: z.literal("development_cone"), diameter: z.number().positive(), height: z.number().positive() }),

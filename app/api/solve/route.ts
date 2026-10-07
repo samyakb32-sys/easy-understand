@@ -33,7 +33,8 @@ Templates:
 - {"template":"isometric_cylinder","diameter":number,"height":number,"scale":"isometric"|"true"}   isometric view of a cylinder with a vertical axis
 - {"template":"section_polyhedron","solid":"prism"|"pyramid","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number,"angle":number,"axisHeight":number}
     a prism or pyramid standing on its base, cut by a plane perpendicular to the VP and inclined "angle" degrees to the HP (1 to 80), crossing the axis "axisHeight" mm above the base. Asks for the sectional top view and the true shape of the section.
-- {"template":"section_round","solid":"cylinder"|"cone","diameter":number,"height":number,"angle":number,"axisHeight":number}   the same for a cylinder or cone
+- {"template":"section_round","solid":"cylinder"|"cone","diameter":number,"height":number,"angle":number,"axisHeight":number,"axisOffset":number,"parallelToGenerator":boolean}
+    the same for a cylinder or cone. Angle may be up to 89 (use 89 for a plane parallel to the axis). "axisOffset" (optional, default 0) is how far right (+) or left (-) of the axis the plane crosses the height "axisHeight". For a cone, set "parallelToGenerator":true when the plane is parallel to the end generator (parabola; the angle is then ignored, give 45 as a placeholder); a steeper plane gives a hyperbola. The plane may leave through the base.
 - {"template":"conic","distance":number,"eccentricity":number}   ellipse (e<1, at most 0.95), parabola (e=1) or hyperbola (e>1) by the eccentricity / focus-directrix method; distance = focus to directrix. If the problem gives e as a ratio such as 2/3, convert it to a decimal.
 - {"template":"development_cone","diameter":number,"height":number}   development of the curved surface of a cone
 - {"template":"development_pyramid","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number}   development of the lateral surface of a regular pyramid (height = axis)
@@ -43,7 +44,7 @@ Templates:
 - {"template":"plane_inclined","shape":"triangle"|"square"|"pentagon"|"hexagon"|"circle","size":number,"angle":number,"phi":number,"rest":"corner"|"edge"}   projections of a plane figure (lamina) whose SURFACE is inclined "angle" degrees to the HP, resting on a corner or a side (a circle rests on a point). "size" is the side, or the diameter of a circle. "phi" is optional: include it only when a side lying in the HP (or, for a circle, the diameter in the HP) is also inclined to the VP by that many degrees (1 to 89); then rest must be "edge". Any other VP condition is "unsupported".
 - {"template":"unsupported","reason":string}                                  anything else, or numbers you cannot read; say briefly why
 
-If a number is unreadable or missing, use "unsupported" rather than guessing. If the cutting plane is described some other way (for example by a trace angle to the VP, or perpendicular to the HP), use "unsupported".`;
+If a number is unreadable or missing, use "unsupported" rather than guessing. If the cutting plane is described some other way (for example by a trace angle to the VP), use "unsupported".`;
 
 type Fail = { ok: false; reason: string; code?: "login_required" | "limit_reached" };
 const fail = (body: Fail, status: number) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });

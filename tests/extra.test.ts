@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { solveSectionRound } from "@/lib/geometry/sections";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "@/lib/geometry/extra";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
 import { solveTilted } from "@/lib/geometry/tilt";
@@ -170,5 +171,38 @@ describe("planes inclined to HP and VP", () => {
   });
   it("needs the lamina to rest on a side", () => {
     expect(solveTilted({ shape: "square", size: 30, angle: 40, rest: "corner", phi: 30 }).ok).toBe(false);
+  });
+});
+
+describe("conic sections of a cone", () => {
+  const cone = (o: Partial<Parameters<typeof solveSectionRound>[0]>) => ok(solveSectionRound({ solid: "cone", diameter: 60, height: 70, angle: 30, axisHeight: 35, ...o }));
+  it("names the curve from the plane angle", () => {
+    expect(cone({ parallelToGenerator: true, axisHeight: 25 }).title).toMatch(/parabola/);
+    expect(cone({ angle: 80, axisHeight: 30, axisOffset: 6 }).title).toMatch(/hyperbola/);
+    expect(cone({ angle: 30 }).title).not.toMatch(/parabola|hyperbola/);
+  });
+  it("every point lies on the cone and on the plane, and the curve ends on the base", () => {
+    for (const o of [{ parallelToGenerator: true, axisHeight: 25 }, { angle: 80, axisHeight: 30, axisOffset: 6 }]) {
+      const sol = cone(o);
+      const top = sol.steps[4].primitives[0];
+      const front = sol.steps[3].primitives.filter((p) => p.t === "line");
+      if (top.t !== "poly") throw new Error();
+      const tan = Math.tan(((o.parallelToGenerator ? (Math.atan2(70, 30) * 180) / Math.PI : o.angle!) * Math.PI) / 180);
+      const x0 = o.axisOffset ?? 0;
+      const yOff = 30 + 15;
+      top.pts.forEach(([x, yy], idx) => {
+        const y = yy + yOff;
+        const rho = Math.hypot(x, y);
+        const z = 70 * (1 - rho / 30);
+        expect(z).toBeGreaterThan(-1e-4);
+        expect(z).toBeCloseTo((o.axisHeight ?? 35) + (x - x0) * tan, 3);
+        if (idx === 0 || idx === top.pts.length - 1) expect(z).toBeCloseTo(0, 3);
+      });
+      expect(front.length).toBeGreaterThan(5);
+    }
+  });
+  it("a cylinder cut through its base is a partial ellipse; two exits are refused", () => {
+    expect(ok(solveSectionRound({ solid: "cylinder", diameter: 40, height: 70, angle: 40, axisHeight: 15 })).title).toBeTruthy();
+    expect(solveSectionRound({ solid: "cylinder", diameter: 40, height: 40, angle: 60, axisHeight: 20 }).ok).toBe(false);
   });
 });

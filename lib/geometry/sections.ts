@@ -18,6 +18,8 @@ type Layout = {
   givens: { name: string; value: string }[];
   theta: number;
   k: number;
+  /** x where the plane crosses height k (0 = through the axis) */
+  x0?: number;
   yOff: number; // top view screen y = plan y - yOff
   xmin: number;
   xmax: number;
@@ -29,24 +31,27 @@ type Layout = {
   labelled: boolean; // number the points (polyhedra only)
   solid: Solution["solid"];
   shapeName: string;
+  /** the curve leaves through the base: the cut face is closed by a straight chord there */
+  open?: boolean;
 };
 
 function buildSteps(L: Layout): Solution {
   const th = (L.theta * Math.PI) / 180;
   const u: Point = [Math.cos(th), Math.sin(th)];
   const dir: Point = [-Math.sin(th), Math.cos(th)]; // perpendicular to the cutting line, pointing up and away
-  const Q0: Point = [0, L.k];
+  const Q0: Point = [L.x0 ?? 0, L.k];
   const F = (c: Corner): Point => [c.x, c.z];
   const T = (c: Corner): Point => [c.x, c.y - L.yOff];
   const d = (c: Corner) => L.yOff - c.y; // distance from XY in the top view = distance from X1Y1 in the auxiliary view
 
-  const reach = Math.max(...L.frontVerts.map((v) => v[0] * dir[0] + (v[1] - L.k) * dir[1]), 0);
+  const reach = Math.max(...L.frontVerts.map((v) => (v[0] - (L.x0 ?? 0)) * dir[0] + (v[1] - L.k) * dir[1]), 0);
   const delta = reach + 14;
   const aux = (s: number): Point => [Q0[0] + dir[0] * delta + u[0] * s, Q0[1] + dir[1] * delta + u[1] * s];
   const trueAt = (c: Corner): Point => [c.x + dir[0] * (delta + d(c)), c.z + dir[1] * (delta + d(c))];
   const smin = Math.min(...L.corners.map((c) => c.s)), smax = Math.max(...L.corners.map((c) => c.s));
   const outline = L.curve ?? L.corners;
-  const half = Math.max(Math.abs(L.xmin), Math.abs(L.xmax)) / Math.cos(th) + 12;
+  const maxZ = Math.max(...L.frontVerts.map((v) => v[1]));
+  const half = Math.min(Math.max(Math.abs(L.xmin), Math.abs(L.xmax)) / Math.cos(th) + 12, (maxZ + 25) / Math.sin(th));
   const num = (i: number) => String(i + 1);
   const off = (p: Point): Point => [p[0] + 1.4, p[1] + 1.4];
 
@@ -105,7 +110,7 @@ function buildSteps(L: Layout): Solution {
     },
     {
       title: "True shape of the section",
-      explanation: `Along each projector, measure from X1Y1 the same distance the point is from XY in the top view. Join the points. The true shape is ${L.shapeName}, with an area of about ${round(area, 1)} mm².`,
+      explanation: `Along each projector, measure from X1Y1 the same distance the point is from XY in the top view. Join the points. The true shape is ${L.shapeName}${L.open ? ", closed by a straight line where the plane leaves through the base" : ""}, with an area of about ${round(area, 1)} mm².`,
       style: "outline",
       primitives: [{ t: "poly", pts: outline.map(trueAt), closed: true }, ...labels(trueAt)],
     },
@@ -169,40 +174,88 @@ export function solveSectionPolyhedron(i: SectionPolyInput): Result {
   return { ok: true, solution: sol };
 }
 
-export type SectionRoundInput = { solid: "cylinder" | "cone"; diameter: number; height: number; angle: number; axisHeight: number };
+export type SectionRoundInput = {
+  solid: "cylinder" | "cone";
+  diameter: number;
+  height: number;
+  angle: number;
+  axisHeight: number;
+  /** x of the point where the plane crosses height `axisHeight`; 0 means through the axis */
+  axisOffset?: number;
+  /** cone only: ignore `angle` and cut parallel to a generator (a parabola) */
+  parallelToGenerator?: boolean;
+};
 
 export function solveSectionRound(i: SectionRoundInput): Result {
-  const r = i.diameter / 2, h = i.height, th = (i.angle * Math.PI) / 180, tan = Math.tan(th);
+  const r = i.diameter / 2, h = i.height, x0 = i.axisOffset ?? 0;
+  const alpha = (Math.atan2(h, r) * 180) / Math.PI; // inclination of a generator of a cone to the HP
+  const parabola = !!i.parallelToGenerator && i.solid === "cone";
+  const angle = parabola ? alpha : i.angle;
+  const th = (angle * Math.PI) / 180, tan = Math.tan(th);
+  if (Math.abs(x0) >= r) return { ok: false, reason: "The plane is outside the solid. Reduce the offset from the axis." };
+  const TOL = 1e-6;
   const at = (phiDeg: number): Corner | null => {
     const p = (phiDeg * Math.PI) / 180, cx = Math.cos(p), sy = Math.sin(p);
-    // height z where the plane meets the surface at azimuth phi
-    const z = i.solid === "cylinder" ? i.axisHeight + r * cx * tan : (i.axisHeight + r * cx * tan) / (1 + (r / h) * cx * tan);
-    if (!(z >= -1e-6 && z <= h + 1e-6)) return null;
+    // height z where the plane z = k + (x - x0) tan(theta) meets the surface at azimuth phi
+    const z = i.solid === "cylinder" ? i.axisHeight + (r * cx - x0) * tan : (i.axisHeight + (r * cx - x0) * tan) / (1 + (r / h) * cx * tan);
+    if (!(z >= -TOL && z <= h + TOL)) return null;
     const rho = i.solid === "cylinder" ? r : r * (1 - z / h);
     const x = rho * cx;
-    return { x, y: rho * sy, z, s: x / Math.cos(th) };
+    return { x, y: rho * sy, z, s: (x - x0) / Math.cos(th) };
   };
-  const marks = Array.from({ length: 12 }, (_, m) => at(m * 30));
-  const dense = Array.from({ length: 72 }, (_, m) => at(m * 5));
-  if (marks.includes(null) || dense.includes(null)) {
-    return { ok: false, reason: "This plane leaves the solid through its base or top, so the section is not a closed ellipse. Raise the axis height, reduce the angle, or choose a different solid for now." };
+  // azimuths where the plane crosses the base (and the top, for a cylinder): the exact ends of an open curve
+  const ends: number[] = [];
+  const crossing = (cx: number) => {
+    if (Math.abs(cx) <= 1) {
+      const a = (Math.acos(cx) * 180) / Math.PI;
+      ends.push(a, 360 - a);
+    }
+  };
+  crossing((x0 - i.axisHeight / tan) / r);
+  if (i.solid === "cylinder") crossing((x0 + (h - i.axisHeight) / tan) / r);
+  /** The valid points in order along the curve; null if the curve is cut into pieces. */
+  const walk = (step: number) => {
+    const az = [...new Set([...Array.from({ length: Math.round(360 / step) }, (_, m) => m * step), ...ends.map((e) => Math.round(e * 1e6) / 1e6)])].sort((a, b) => a - b);
+    const pts = az.map((a) => at(a));
+    if (pts.every(Boolean)) return { pts: pts as Corner[], open: false };
+    const start = pts.findIndex((q, m) => q && !pts[(m + pts.length - 1) % pts.length]);
+    if (start < 0) return null;
+    const run: Corner[] = [];
+    let m = start;
+    while (pts[m % pts.length]) run.push(pts[m++ % pts.length]!);
+    if (run.length !== pts.filter(Boolean).length) return null; // more than one piece
+    return { pts: run, open: true };
+  };
+  const marks = walk(30), dense = walk(5);
+  if (!marks || !dense || marks.pts.length < 3) {
+    return { ok: false, reason: "The plane does not cut this solid in a single piece. Check the angle and the height of the cut." };
   }
+  const open = marks.open;
+  const kind =
+    i.solid === "cylinder" ? (open ? "part of an ellipse" : "an ellipse")
+    : parabola || Math.abs(angle - alpha) < 0.01 ? "a parabola"
+    : angle > alpha ? "a hyperbola"
+    : open ? "part of an ellipse" : "an ellipse";
   const yOff = r + GAP;
   const front: Primitive[] = [{ t: "poly", closed: true, pts: i.solid === "cylinder" ? [[-r, 0], [r, 0], [r, h], [-r, h]] : [[-r, 0], [r, 0], [0, h]] }];
   const top: Primitive[] = [{ t: "circle", c: [0, -yOff], r }];
   const solidName = i.solid;
+  const where = x0 ? `crossing the height of ${i.axisHeight} mm above the base at ${Math.abs(x0)} mm ${x0 > 0 ? "right" : "left"} of the axis` : `passing through the axis at ${i.axisHeight} mm above the base`;
+  const incl = parabola ? `parallel to the end generator (${round(alpha, 1)}° to the HP)` : `inclined at ${angle}° to the HP`;
   const sol = buildSteps({
-    title: `Section of a ${solidName}`,
-    problem: `A ${solidName} of base diameter ${i.diameter} mm and height ${h} mm stands on its base on the HP. It is cut by a plane perpendicular to the VP and inclined at ${i.angle}° to the HP, passing through the axis at ${i.axisHeight} mm above the base. Draw the sectional top view and the true shape of the section.`,
+    title: `Section of a ${solidName}${/parabola|hyperbola/.test(kind) ? `: ${kind.replace("a ", "")}` : ""}`,
+    problem: `A ${solidName} of base diameter ${i.diameter} mm and height ${h} mm stands on its base on the HP. It is cut by a plane perpendicular to the VP and ${incl}, ${where}. Draw the sectional top view and the true shape of the section.`,
     givens: [
       { name: "Diameter", value: `${i.diameter} mm` },
       { name: "Height", value: `${h} mm` },
-      { name: "Plane to HP", value: `${i.angle}°` },
-      { name: "Axis height", value: `${i.axisHeight} mm` },
+      { name: "Plane to HP", value: parabola ? `${round(alpha, 1)}° (parallel to generator)` : `${angle}°` },
+      { name: "Height of cut", value: `${i.axisHeight} mm` },
+      ...(x0 ? [{ name: "Offset from axis", value: `${Math.abs(x0)} mm` }] : []),
     ],
-    theta: i.angle, k: i.axisHeight, yOff, xmin: -r, xmax: r,
+    theta: angle, k: i.axisHeight, x0, yOff, xmin: -r, xmax: r,
     frontVerts: i.solid === "cylinder" ? [[-r, 0], [r, 0], [r, h], [-r, h]] : [[-r, 0], [r, 0], [0, h]],
-    front, top, corners: marks as Corner[], curve: dense as Corner[], labelled: false, shapeName: "an ellipse",
+    front, top, corners: marks.pts, curve: dense.pts, labelled: false, shapeName: kind,
+    open,
     solid: { kind: "revolve", profile: i.solid === "cylinder" ? [[0, 0], [r, 0], [r, h], [0, h]] : [[0, 0], [r, 0], [0, h]] },
   });
   return { ok: true, solution: sol };

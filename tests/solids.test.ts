@@ -104,8 +104,8 @@ describe("sections of solids", () => {
     expect(Math.abs(+m[1] - exact) / exact).toBeLessThan(0.005);
   });
 
-  it("explains when the plane leaves through the base", () => {
-    const r = solveSectionRound({ solid: "cylinder", diameter: 40, height: 70, angle: 30, axisHeight: 5 });
+  it("refuses a plane that cuts the solid into pieces", () => {
+    const r = solveSectionRound({ solid: "cylinder", diameter: 40, height: 30, angle: 60, axisHeight: 15 });
     expect(r.ok).toBe(false);
   });
 
