@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { solveSectionRound } from "@/lib/geometry/sections";
 import { solveIsometricCone, solveIsometricSphere } from "@/lib/geometry/isometric";
+import { solveCylinderPenetration } from "@/lib/geometry/penetration";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "@/lib/geometry/extra";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
 import { solveTilted } from "@/lib/geometry/tilt";
@@ -240,5 +241,35 @@ describe("isometric cone and sphere", () => {
     const el = prims(s, 2)[0], arc = prims(s, 3)[0];
     if (el.t !== "ellipse" || arc.t !== "arc") throw new Error();
     expect(arc.r).toBeCloseTo(el.rx, 6);
+  });
+});
+
+describe("interpenetration of cylinders", () => {
+  const pen = (o: object) => ok(solveCylinderPenetration({ mainDiameter: 60, mainHeight: 80, branchDiameter: 40, ...o }));
+  it("every curve point lies on both cylinders", () => {
+    const s = pen({});
+    const curve = prims(s, 5)[0];
+    if (curve.t !== "poly") throw new Error();
+    const zc = 40, R = 30, r = 20;
+    for (const [x, z] of curve.pts) {
+      // on the branch: depth y satisfies y^2 + (z - zc)^2 = r^2; on the main: x^2 + y^2 = R^2
+      const y2 = r * r - (z - zc) ** 2;
+      expect(y2).toBeGreaterThanOrEqual(-1e-9);
+      expect(x * x + y2).toBeCloseTo(R * R, 6);
+    }
+  });
+  it("equal diameters give straight lines", () => {
+    const s = pen({ branchDiameter: 60 });
+    const curve = prims(s, 5)[0];
+    if (curve.t !== "poly") throw new Error();
+    const [a, b] = [curve.pts[0], curve.pts[curve.pts.length - 1]];
+    const mid = curve.pts[18];
+    expect(mid[0]).toBeCloseTo(0, 6); // passes through the axis
+    expect(Math.abs(a[0])).toBeCloseTo(Math.abs(a[1] - 40), 6); // 45 degree line
+    expect(Math.abs(b[0])).toBeCloseTo(Math.abs(b[1] - 40), 6);
+  });
+  it("rejects a branch that is bigger or does not fit", () => {
+    expect(solveCylinderPenetration({ mainDiameter: 40, mainHeight: 80, branchDiameter: 50 }).ok).toBe(false);
+    expect(solveCylinderPenetration({ mainDiameter: 60, mainHeight: 80, branchDiameter: 40, axisHeight: 10 }).ok).toBe(false);
   });
 });

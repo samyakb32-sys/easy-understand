@@ -2,6 +2,7 @@ import type { Solution } from "../schema";
 import { solveIsometricCone, solveIsometricCylinder, solveIsometricPrism, solveIsometricSphere } from "../geometry/isometric";
 import { solveSectionPolyhedron, solveSectionRound } from "../geometry/sections";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "../geometry/extra";
+import { solveCylinderPenetration } from "../geometry/penetration";
 import { solveTilted } from "../geometry/tilt";
 import { solveCylinder, solveLineProjection, solvePentagon, solvePrism } from "../geometry/solvers";
 
@@ -26,6 +27,8 @@ export const SAMPLES: Record<string, Solution> = {
   "section-cone-parabola": mustSolve(solveSectionRound({ solid: "cone", diameter: 60, height: 70, angle: 0, axisHeight: 25, parallelToGenerator: true })),
   "section-cone-hyperbola": mustSolve(solveSectionRound({ solid: "cone", diameter: 60, height: 70, angle: 80, axisHeight: 30, axisOffset: 6 })),
   "section-cylinder": mustSolve(solveSectionRound({ solid: "cylinder", diameter: 40, height: 70, angle: 30, axisHeight: 35 })),
+  "penetration-cylinders": mustSolve(solveCylinderPenetration({ mainDiameter: 60, mainHeight: 80, branchDiameter: 40 })),
+  "penetration-equal": mustSolve(solveCylinderPenetration({ mainDiameter: 40, mainHeight: 70, branchDiameter: 40 })),
   "ellipse-eccentricity": mustSolve(solveConic(50, 2 / 3)),
   "parabola-eccentricity": mustSolve(solveConic(40, 1)),
   "hyperbola-eccentricity": mustSolve(solveConic(40, 3 / 2)),
@@ -58,6 +61,8 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "section-cone-parabola": "Sections of solids",
   "section-cone-hyperbola": "Sections of solids",
   "section-cylinder": "Sections of solids",
+  "penetration-cylinders": "Interpenetration of solids",
+  "penetration-equal": "Interpenetration of solids",
   "ellipse-eccentricity": "Engineering curves",
   "parabola-eccentricity": "Engineering curves",
   "hyperbola-eccentricity": "Engineering curves",
