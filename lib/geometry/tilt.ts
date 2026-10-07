@@ -234,10 +234,11 @@ export type TiltInput =
 
 export function solveTilted(input: TiltInput): Result {
   const isPlane = "shape" in input;
+  /** a lamina resting on a corner: the VP angle belongs to the line from that corner to the centre (the line of greatest slope) */
+  const byCorner = "shape" in input && input.shape !== "circle" && input.rest === "corner";
   const theta = input.angle;
   if (!(theta > 0 && theta < 90)) return { ok: false, reason: "The inclination must be between 0° and 90°." };
   const phiDeg = input.phi ?? 0;
-  if (phiDeg && "shape" in input && input.shape !== "circle" && input.rest !== "edge") return { ok: false, reason: "To give the inclination of a side to the VP, the lamina must rest on that side (on the HP)." };
   if (phiDeg && !(phiDeg > 0 && phiDeg < 90)) return { ok: false, reason: "The inclination to the VP must be between 0° and 90°." };
 
   let spec: Spec;
@@ -250,8 +251,8 @@ export function solveTilted(input: TiltInput): Result {
     title = `Projection of a ${name} lamina${phiDeg ? " inclined to HP and VP" : ""}`;
     problem = input.shape === "circle"
       ? `A circular lamina of diameter ${input.size} mm rests on the HP on a point of its circumference, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and the diameter in the HP inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`
-      : `A ${name} lamina of side ${input.size} mm rests on the HP on ${input.rest === "edge" ? "one side" : "one corner"}, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and that side inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`;
-    givens = [{ name: input.shape === "circle" ? "Diameter" : "Side", value: `${input.size} mm` }, { name: "Surface inclined to HP", value: `${theta}°` }, ...(phiDeg ? [{ name: input.shape === "circle" ? "Diameter to VP" : "Side to VP", value: `${phiDeg}°` }] : [])];
+      : `A ${name} lamina of side ${input.size} mm rests on the HP on ${input.rest === "edge" ? "one side" : "one corner"}, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and ${byCorner ? "the plan of the line joining that corner to the centre" : "that side"} inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`;
+    givens = [{ name: input.shape === "circle" ? "Diameter" : "Side", value: `${input.size} mm` }, { name: "Surface inclined to HP", value: `${theta}°` }, ...(phiDeg ? [{ name: input.shape === "circle" ? "Diameter to VP" : byCorner ? "Corner-to-centre line to VP" : "Side to VP", value: `${phiDeg}°` }] : [])];
   } else if (input.solid === "cone") {
     spec = { solid: "cone", r: input.diameter / 2, height: input.height };
     title = phiDeg ? "Cone with its axis inclined to the HP and VP" : "Cone with its axis inclined to the HP";
@@ -274,7 +275,8 @@ export function solveTilted(input: TiltInput): Result {
   // shift the final views to the right of the initial ones
   const dx = built.maxX + 30 - probe.minX;
   const fin = views(built, a, dx);
-  const phi = rad(isPlane ? 90 - phiDeg : phiDeg); // a lamina's tilt edge starts perpendicular to XY, so it turns through 90 - phi
+  // a lamina's tilt edge starts perpendicular to XY, so it turns through 90 - phi; the corner-to-centre line starts along XY, so phi itself
+  const phi = rad(isPlane && !byCorner ? 90 - phiDeg : phiDeg);
   const dx2 = fin.maxX + 30 - views(built, a, dx, phi).minX;
   const probe2 = views(built, a, dx, phi, dx2);
   const dy = GAP - probe2.minY;
@@ -373,8 +375,12 @@ export function solveTilted(input: TiltInput): Result {
     const sh = built.shape;
     let turnMark: Primitive[];
     if (sh.kind === "plane") {
-      const idx = input_isCircle(spec) ? [1, 3] : sh.corners.map((c, i) => (c[0] >= built.maxX - 1e-9 ? i : -1)).filter((i) => i >= 0);
-      let A = turn(sh.corners[idx[0]]), B = turn(sh.corners[idx[1]]);
+      const pair: Vec3[] = input_isCircle(spec)
+        ? [sh.corners[1], sh.corners[3]]
+        : byCorner
+          ? [built.pivot, mean(sh.corners)]
+          : sh.corners.filter((c) => c[0] >= built.maxX - 1e-9).slice(0, 2);
+      let A = turn(pair[0]), B = turn(pair[1]);
       if (B[0] < A[0]) [A, B] = [B, A];
       const ang = (Math.atan2(B[1] - A[1], B[0] - A[0]) * 180) / Math.PI;
       const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
@@ -400,7 +406,7 @@ export function solveTilted(input: TiltInput): Result {
     }
     steps.push({
       title: `Turn the top view through ${phiDeg}°`,
-      explanation: isPlane ? `Copy the final top view to a new place, turned so the side (or diameter) that lies in the HP makes ${phiDeg}° with XY. Its shape does not change.` : `Copy the final top view to a new place, turned so the plan of the axis makes ${phiDeg}° with XY. Its size and shape do not change, and the solid still touches the HP at the same point. Edges that are hidden are dotted.`,
+      explanation: isPlane ? `Copy the final top view to a new place, turned so the ${byCorner ? "line joining the resting corner to the centre" : "side (or diameter) that lies in the HP"} makes ${phiDeg}° with XY. Its shape does not change.` : `Copy the final top view to a new place, turned so the plan of the axis makes ${phiDeg}° with XY. Its size and shape do not change, and the solid still touches the HP at the same point. Edges that are hidden are dotted.`,
       style: "outline",
       primitives: [...turnMark, ...fin2.tv],
     });
@@ -442,8 +448,9 @@ const SWAP: Record<string, string> = {
   "Top view": "Front view", "Front view": "Top view", "Top-view": "Front-view", "Front-view": "Top-view",
   HP: "VP", VP: "HP", upward: "downward", downward: "upward", "projectors down": "projectors up", "projectors up": "projectors down",
   height: "depth", depth: "height", heights: "depths", depths: "heights",
+  "plan of the axis": "front view of the axis", "Plan of the axis": "Front view of the axis", "plan of axis": "front view of axis", "Plan of axis": "Front view of axis",
 };
-const swapWords = (s: string) => s.replace(/projectors (?:up|down)|\b(?:[Tt]op|[Ff]ront)[ -]view\b|\bHP\b|\bVP\b|\bupward\b|\bdownward\b|\b(?:height|depth)s?\b/g, (m) => SWAP[m] ?? m);
+const swapWords = (s: string) => s.replace(/projectors (?:up|down)|\b[Pp]lan of (?:the )?axis\b|\b(?:[Tt]op|[Ff]ront)[ -]view\b|\bHP\b|\bVP\b|\bupward\b|\bdownward\b|\b(?:height|depth)s?\b/g, (m) => SWAP[m] ?? m);
 
 const flip = (p: Primitive): Primitive => {
   const f = (q: Point): Point => [q[0], -q[1]];
@@ -457,6 +464,14 @@ const flip = (p: Primitive): Primitive => {
   }
 };
 
+const mirror = (s: Solution): Solution => ({
+  ...s,
+  title: swapWords(s.title).replace("inclined to HP and VP", "inclined to VP and HP").replace("inclined to the HP and VP", "inclined to the VP and HP"),
+  problem: swapWords(s.problem),
+  givens: s.givens.map((g) => ({ name: swapWords(g.name), value: g.value })),
+  steps: s.steps.map((st) => ({ ...st, title: swapWords(st.title), explanation: swapWords(st.explanation), primitives: st.primitives.map(flip) })),
+});
+
 /**
  * A lamina placed with its surface inclined to the VP first (true shape in the front view), then a side inclined to the HP.
  * Solved as the HP-first problem and then reflected in XY, which swaps the roles of the two planes.
@@ -464,16 +479,14 @@ const flip = (p: Primitive): Primitive => {
  */
 export function solveTiltedVpFirst(input: { shape: RegularBase | "circle"; size: number; surfaceToVP: number; sideToHP?: number; rest: "corner" | "edge" }): Result {
   const r = solveTilted({ shape: input.shape, size: input.size, angle: input.surfaceToVP, rest: input.rest, phi: input.sideToHP });
-  if (!r.ok) return r;
-  const s = r.solution;
-  return {
-    ok: true,
-    solution: {
-      ...s,
-      title: swapWords(s.title).replace("inclined to HP and VP", "inclined to VP and HP"),
-      problem: swapWords(s.problem),
-      givens: s.givens.map((g) => ({ name: swapWords(g.name), value: g.value })),
-      steps: s.steps.map((st) => ({ ...st, title: swapWords(st.title), explanation: swapWords(st.explanation), primitives: st.primitives.map(flip) })),
-    },
-  };
+  return r.ok ? { ok: true, solution: mirror(r.solution) } : r;
+}
+
+/**
+ * A solid resting on the VP with its axis inclined to the VP first, then the front view of the axis inclined to the HP.
+ * The mirror image of the HP-first solid problem.
+ */
+export function solveSolidVpFirst(input: Exclude<TiltInput, { shape: unknown }> & { axisToVP?: never }): Result {
+  const r = solveTilted(input);
+  return r.ok ? { ok: true, solution: mirror(r.solution) } : r;
 }

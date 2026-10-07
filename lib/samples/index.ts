@@ -4,7 +4,7 @@ import { solveSectionPolyhedron, solveSectionRound } from "../geometry/sections"
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "../geometry/extra";
 import { solveIsometricComposite } from "../geometry/composite";
 import { solveCylinderPenetration } from "../geometry/penetration";
-import { solveTilted, solveTiltedVpFirst } from "../geometry/tilt";
+import { solveSolidVpFirst, solveTilted, solveTiltedVpFirst } from "../geometry/tilt";
 import { solveCylinder, solveLineProjection, solvePentagon, solvePrism } from "../geometry/solvers";
 
 function mustSolve(r: { ok: true; solution: Solution } | { ok: false; reason: string }): Solution {
@@ -48,6 +48,9 @@ export const SAMPLES: Record<string, Solution> = {
   "plane-hp-vp": mustSolve(solveTilted({ shape: "hexagon", size: 25, angle: 45, rest: "edge", phi: 30 })),
   "circle-hp-vp": mustSolve(solveTilted({ shape: "circle", size: 50, angle: 30, rest: "edge", phi: 40 })),
   "plane-vp-first": mustSolve(solveTiltedVpFirst({ shape: "pentagon", size: 30, surfaceToVP: 45, sideToHP: 30, rest: "edge" })),
+  "cone-vp-first": mustSolve(solveSolidVpFirst({ solid: "cone", diameter: 40, height: 60, angle: 40, phi: 30 })),
+  "prism-vp-first": mustSolve(solveSolidVpFirst({ solid: "prism", base: "pentagon", side: 25, height: 50, angle: 35, rest: "edge", phi: 45 })),
+  "plane-corner-hp-vp": mustSolve(solveTilted({ shape: "square", size: 30, angle: 40, rest: "corner", phi: 30 })),
   "plane-inclined": mustSolve(solveTilted({ shape: "pentagon", size: 30, angle: 45, rest: "edge" })),
 };
 
@@ -86,5 +89,8 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "plane-hp-vp": "Projection of planes",
   "circle-hp-vp": "Projection of planes",
   "plane-vp-first": "Projection of planes",
+  "cone-vp-first": "Projection of solids",
+  "prism-vp-first": "Projection of solids",
+  "plane-corner-hp-vp": "Projection of planes",
   "plane-inclined": "Projection of planes",
 };

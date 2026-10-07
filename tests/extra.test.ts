@@ -5,7 +5,7 @@ import { solveCylinderPenetration } from "@/lib/geometry/penetration";
 import { solveIsometricComposite } from "@/lib/geometry/composite";
 import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "@/lib/geometry/extra";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
-import { solveTilted, solveTiltedVpFirst } from "@/lib/geometry/tilt";
+import { solveSolidVpFirst, solveTilted, solveTiltedVpFirst } from "@/lib/geometry/tilt";
 import type { Primitive, Solution } from "@/lib/schema";
 
 const ok = <T extends { ok: boolean }>(r: T) => {
@@ -172,8 +172,17 @@ describe("planes inclined to HP and VP", () => {
     expect(Math.max(...fvY)).toBeCloseTo(Math.max(...ys(prims(s, 2).filter((p) => p.t === "line" && p.style === "outline"))), 4);
     expect(Math.max(...ys(prims(s, 5).filter((p) => p.t === "poly")))).toBeLessThan(0);
   });
-  it("needs the lamina to rest on a side", () => {
-    expect(solveTilted({ shape: "square", size: 30, angle: 40, rest: "corner", phi: 30 }).ok).toBe(false);
+  it("a lamina resting on a corner: the corner-to-centre line ends up at phi to XY", () => {
+    const s = ok(solveTilted({ shape: "square", size: 30, angle: 40, rest: "corner", phi: 30 }));
+    expect(s.problem).toMatch(/joining that corner to the centre/);
+    const mark = prims(s, 5).find((p) => p.t === "arc");
+    if (!mark || mark.t !== "arc") throw new Error("no arc");
+    expect(Math.abs(mark.to - mark.from)).toBeCloseTo(30, 4);
+    // the turned top view of a square is still a square of side 30 x cos-foreshortened: it keeps the same area as the first top view of the tilted figure
+    const area = (pts: number[][]) => Math.abs(pts.reduce((a, p, i) => a + p[0] * pts[(i + 1) % pts.length][1] - pts[(i + 1) % pts.length][0] * p[1], 0)) / 2;
+    const tvs = (st: number) => prims(s, st).find((p) => p.t === "poly" && p.closed) as Extract<Primitive, { t: "poly" }>;
+    expect(area(tvs(5).pts)).toBeCloseTo(area(tvs(4).pts), 6);
+    expect(area(tvs(4).pts)).toBeCloseTo(900 * Math.cos((40 * Math.PI) / 180), 6);
   });
 });
 
@@ -321,5 +330,31 @@ describe("planes inclined to the VP first", () => {
     const last = prims(vp, 7).flatMap((p) => (p.t === "poly" ? p.pts : []));
     expect(Math.min(...last.map((q) => q[1]))).toBeLessThan(-1e-6); // the top view is below XY
     expect(Math.max(...ys(prims(vp, 5).filter((p) => p.t === "poly")))).toBeGreaterThan(0); // the turned front view is above
+  });
+});
+
+describe("solids inclined to the VP first", () => {
+  const cone = ok(solveSolidVpFirst({ solid: "cone", diameter: 40, height: 60, angle: 40, phi: 30 }));
+  const prism = ok(solveSolidVpFirst({ solid: "prism", base: "hexagon", side: 25, height: 50, angle: 30, rest: "edge", phi: 50 }));
+  it("is the mirror image: true base in the front view, axis angle to the VP, wording swapped", () => {
+    expect(cone.problem).toMatch(/rests on a point of its base circle on the VP/);
+    expect(cone.problem).toMatch(/axis inclined at 40° to the VP and the front view of the axis inclined at 30° to the HP/);
+    expect(cone.steps[0].title).toMatch(/front view in the simple position/);
+    expect(JSON.stringify(cone)).not.toMatch(/plan of the axis|top view in the simple/);
+    const first = prims(prism, 0).filter((p) => p.t === "line" && p.style !== "centre");
+    expect(first.length).toBeGreaterThan(6);
+    expect(Math.min(...ys(first))).toBeGreaterThanOrEqual(-1e-6); // the true shape sits above XY
+  });
+  it("keeps the angles and gives hidden edges for the prism", () => {
+    expect(prism.steps).toHaveLength(8);
+    const arc = prims(prism, 5).find((p) => p.t === "arc");
+    if (!arc || arc.t !== "arc") throw new Error();
+    expect(Math.abs(arc.to - arc.from)).toBeCloseTo(50, 4);
+    expect(prims(prism, 7).some((p) => p.t === "line" && p.style === "hidden")).toBe(true);
+  });
+  it("the first view of the axis angle: front view tilt mark is at the asked angle", () => {
+    const m = prims(cone, 2).find((p) => p.t === "arc");
+    if (!m || m.t !== "arc") throw new Error();
+    expect(Math.abs(m.to - m.from)).toBeCloseTo(40, 4);
   });
 });
