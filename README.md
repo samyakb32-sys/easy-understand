@@ -52,4 +52,4 @@ Sign-in and the database use **Supabase**; payments use **Razorpay**. Nothing he
 
 ## Not done yet
 
-Refund/invoice tooling (refunds are done from the Razorpay dashboard), an admin view, GST invoices, the OpenCV/OCR pre-processing step, and some problem types (sections where the plane leaves through the base of a cone or cylinder, i.e. parabola/hyperbola; planes inclined to the VP; isometric of cones, spheres and composite solids).
+Refund/invoice tooling (refunds are done from the Razorpay dashboard), an admin view, GST invoices, the OpenCV/OCR pre-processing step, and some problem types (sections where the plane leaves through the base of a cone or cylinder, i.e. parabola/hyperbola sections; planes and solids inclined to both HP and VP, which need the second tilt; isometric of cones, spheres and composite solids; interpenetration of solids).

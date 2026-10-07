@@ -34,6 +34,13 @@ Templates:
 - {"template":"section_polyhedron","solid":"prism"|"pyramid","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number,"angle":number,"axisHeight":number}
     a prism or pyramid standing on its base, cut by a plane perpendicular to the VP and inclined "angle" degrees to the HP (1 to 80), crossing the axis "axisHeight" mm above the base. Asks for the sectional top view and the true shape of the section.
 - {"template":"section_round","solid":"cylinder"|"cone","diameter":number,"height":number,"angle":number,"axisHeight":number}   the same for a cylinder or cone
+- {"template":"conic","distance":number,"eccentricity":number}   ellipse (e<1, at most 0.95), parabola (e=1) or hyperbola (e>1) by the eccentricity / focus-directrix method; distance = focus to directrix. If the problem gives e as a ratio such as 2/3, convert it to a decimal.
+- {"template":"development_cone","diameter":number,"height":number}   development of the curved surface of a cone
+- {"template":"development_pyramid","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number}   development of the lateral surface of a regular pyramid (height = axis)
+- {"template":"development_prism","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number}   development of a regular prism
+- {"template":"solid_inclined","solid":"prism"|"pyramid"|"cone","base":"triangle"|"square"|"pentagon"|"hexagon","size":number,"height":number,"angle":number,"rest":"corner"|"edge"}
+    projections of a solid standing on its base that is then tilted so its AXIS makes "angle" degrees (1 to 89) with the HP, the base touching the HP at a corner ("corner") or along an edge ("edge"). "size" is the base side (prism, pyramid) or the base diameter (cone); leave "base" out for a cone. "height" is the axis length. If the problem instead tilts a base edge or a generator to the HP, or adds an angle to the VP, use "unsupported".
+- {"template":"plane_inclined","shape":"triangle"|"square"|"pentagon"|"hexagon"|"circle","size":number,"angle":number,"rest":"corner"|"edge"}   projections of a plane figure (lamina) whose SURFACE is inclined "angle" degrees to the HP, resting on a corner or a side (a circle rests on a point). "size" is the side, or the diameter of a circle. A surface also inclined to the VP is "unsupported".
 - {"template":"unsupported","reason":string}                                  anything else, or numbers you cannot read; say briefly why
 
 If a number is unreadable or missing, use "unsupported" rather than guessing. If the cutting plane is described some other way (for example by a trace angle to the VP, or perpendicular to the HP), use "unsupported".`;

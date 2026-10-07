@@ -1,7 +1,9 @@
 import { z } from "zod";
 import type { Point, Primitive, Solution, Step } from "../schema";
 import { circleIntersections, lineProjection, pentagonOnBase, round } from "./basic";
+import { solveConeDevelopment, solveConic, solvePrismDevelopment, solvePyramidDevelopment } from "./extra";
 import { solveIsometricCylinder, solveIsometricPrism } from "./isometric";
+import { solveTilted } from "./tilt";
 import { solveSectionPolyhedron, solveSectionRound } from "./sections";
 
 /**
@@ -48,6 +50,30 @@ export const Template = z.discriminatedUnion("template", [
     angle: z.number().min(1).max(80),
     axisHeight: z.number().min(0),
   }),
+  z.object({ template: z.literal("conic"), distance: z.number().positive(), eccentricity: z.number().positive() }),
+  z.object({ template: z.literal("development_cone"), diameter: z.number().positive(), height: z.number().positive() }),
+  z.object({ template: z.literal("development_pyramid"), base: z.enum(["triangle", "square", "pentagon", "hexagon"]), side: z.number().positive(), height: z.number().positive() }),
+  z.object({ template: z.literal("development_prism"), base: z.enum(["triangle", "square", "pentagon", "hexagon"]), side: z.number().positive(), height: z.number().positive() }),
+  z.object({
+    template: z.literal("solid_inclined"),
+    solid: z.enum(["prism", "pyramid", "cone"]),
+    base: z.enum(["triangle", "square", "pentagon", "hexagon"]).optional(),
+    /** base side (prism, pyramid) or base diameter (cone) */
+    size: z.number().positive(),
+    height: z.number().positive(),
+    /** inclination of the axis to the HP, degrees */
+    angle: z.number().min(1).max(89),
+    rest: z.enum(["corner", "edge"]).default("corner"),
+  }),
+  z.object({
+    template: z.literal("plane_inclined"),
+    shape: z.enum(["triangle", "square", "pentagon", "hexagon", "circle"]),
+    /** side, or diameter for a circle */
+    size: z.number().positive(),
+    /** inclination of the surface to the HP, degrees */
+    angle: z.number().min(1).max(89),
+    rest: z.enum(["corner", "edge"]).default("edge"),
+  }),
 ]);
 export type Template = z.infer<typeof Template>;
 
@@ -82,6 +108,20 @@ export function solveTemplate(t: Template): SolveResult {
       return solveSectionPolyhedron(t);
     case "section_round":
       return solveSectionRound(t);
+    case "conic":
+      return solveConic(t.distance, t.eccentricity);
+    case "development_cone":
+      return solveConeDevelopment(t.diameter, t.height);
+    case "development_pyramid":
+      return solvePyramidDevelopment(t.base, t.side, t.height);
+    case "development_prism":
+      return solvePrismDevelopment(t.base, t.side, t.height);
+    case "solid_inclined":
+      if (t.solid === "cone") return solveTilted({ solid: "cone", diameter: t.size, height: t.height, angle: t.angle });
+      if (!t.base) return { ok: false, reason: "Tell me the base shape (triangle, square, pentagon or hexagon)." };
+      return solveTilted({ solid: t.solid, base: t.base, side: t.size, height: t.height, angle: t.angle, rest: t.rest });
+    case "plane_inclined":
+      return solveTilted({ shape: t.shape, size: t.size, angle: t.angle, rest: t.rest });
   }
 }
 

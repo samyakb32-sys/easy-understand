@@ -92,7 +92,7 @@ export function UploadSolver() {
           {code === "limit_reached" && <Link href="/#pricing" className="underline">See Pro plans</Link>}
         </p>
       )}
-      <p className="muted text-xs">Supports projection of lines, pentagon construction, cylinder development, prism views, isometric views of prisms and cylinders, and sections of prisms, pyramids, cylinders and cones. More problem types are on the way.</p>
+      <p className="muted text-xs">Supports projection of lines, pentagon construction, ellipse, parabola and hyperbola by the eccentricity method, views and isometric views of prisms and cylinders, projection of planes and of solids with the axis inclined to the HP, sections of prisms, pyramids, cylinders and cones, and development of cylinders, cones, prisms and pyramids. More problem types are on the way.</p>
     </div>
   );
 }
