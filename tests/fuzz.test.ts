@@ -294,14 +294,9 @@ function clean(v: unknown): unknown {
 /**
  * Open findings, kept out of the sweep until fixed (each has an `it.fails` below that flips red when it is fixed;
  * then delete the exemption here and the `it.fails`).
- *  - section_round + parallelToGenerator: the caption prints the derived plane angle unrounded.
  *  - interpenetration_* at about 0.01 mm: absolute epsilons give NaN coordinates (sizes this small are not real problems).
- *  - solid_inclined with angle < 5: the axis-angle construction line is extended to XY, so a 60 mm solid gets a
- *    drawing 10-40 x its size (and > 1e6 mm at 1e5 mm inputs).
  */
 function knownIssue(raw: Record<string, unknown>, cls: string): boolean {
-  if (raw.template === "section_round" && raw.parallelToGenerator === true && cls === "ugly-number") return true;
-  if (raw.template === "solid_inclined" && Number(raw.angle) < 5 && (cls === "extent-too-large" || cls === "coord-ge-1e6")) return true;
   // absolute epsilons (r > R + 1e-9 ...) instead of relative ones: a 0.01 mm main cylinder with a branch 5e-10 mm wider gives NaN
   if (String(raw.template).startsWith("interpenetration_") && cls === "solution-schema" && Number(raw.mainDiameter ?? raw.coneDiameter ?? raw.side) <= 0.1) return true;
   return false;
@@ -361,23 +356,34 @@ describe("fuzz: template coverage", () => {
   });
 });
 
-describe("fuzz: open findings (it.fails: remove the .fails and the knownIssue() exemption once fixed)", () => {
-  it.fails("section_round parallelToGenerator: caption rounds the derived angle", () => {
+describe("fuzz: regressions", () => {
+  it("section_round parallelToGenerator: caption rounds the derived angle", () => {
     const r = solveTemplate(Template.parse({ template: "section_round", solid: "cone", diameter: 60, height: 70, angle: 45, axisHeight: 25, parallelToGenerator: true }));
     expect(r.ok && r.solution.steps[1].explanation).not.toMatch(/\d\.\d{4,}/);
+    expect(r.ok && r.solution.steps[1].explanation).toMatch(/66\.8°/);
   });
-  it.fails("section_round with an axis offset says the plane passes through the axis", () => {
+  it("section_round with an axis offset says where the plane crosses, not 'through the axis'", () => {
     const r = solveTemplate(Template.parse({ template: "section_round", solid: "cone", diameter: 60, height: 70, angle: 80, axisHeight: 30, axisOffset: 6 }));
     expect(r.ok && r.solution.steps[1].explanation).not.toMatch(/through the axis/);
+    expect(r.ok && r.solution.steps[1].explanation).toMatch(/6 mm right of the axis/);
+    const l = solveTemplate(Template.parse({ template: "section_round", solid: "cone", diameter: 60, height: 70, angle: 80, axisHeight: 30, axisOffset: -6 }));
+    expect(l.ok && l.solution.steps[1].explanation).toMatch(/6 mm left of the axis/);
   });
-  it.fails("section_round cylinder cut by a steep plane (the prompt says use 89 for 'parallel to the axis') is drawn, not refused", () => {
-    expect(solveTemplate(Template.parse({ template: "section_round", solid: "cylinder", diameter: 40, height: 70, angle: 89, axisHeight: 35 })).ok).toBe(true);
+  it("section_round cylinder cut by a steep plane (the prompt says use 89 for 'parallel to the axis') is drawn, not refused", () => {
+    for (const o of [{ diameter: 40, height: 70, angle: 89, axisHeight: 35 }, { diameter: 50, height: 80, angle: 60, axisHeight: 40 }, { diameter: 40, height: 70, angle: 75, axisHeight: 35, axisOffset: -8 }]) {
+      const r = solveTemplate(Template.parse({ template: "section_round", solid: "cylinder", ...o }));
+      expect(r.ok, JSON.stringify(o)).toBe(true);
+    }
   });
-  it.fails("solid_inclined at 1 degree stays within 10 x the solid", () => {
+  it("solid_inclined at 1 degree stays within 10 x the solid", () => {
     const r = solveTemplate(Template.parse({ template: "solid_inclined", solid: "pyramid", base: "hexagon", size: 30, height: 60, angle: 1, rest: "corner" }));
     if (!r.ok) throw new Error(r.reason);
     const xs = r.solution.steps.flatMap((s) => s.primitives.flatMap((p) => (p.t === "line" ? [p.a[0], p.b[0]] : [])));
     expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(600);
+  });
+  it("every sample lesson has a distinct title", () => {
+    const titles = Object.values(SAMPLES).map((x) => x.title);
+    expect(new Set(titles).size).toBe(titles.length);
   });
 });
 

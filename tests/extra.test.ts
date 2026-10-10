@@ -196,8 +196,8 @@ describe("conic sections of a cone", () => {
   it("every point lies on the cone and on the plane, and the curve ends on the base", () => {
     for (const o of [{ parallelToGenerator: true, axisHeight: 25 }, { angle: 80, axisHeight: 30, axisOffset: 6 }]) {
       const sol = cone(o);
-      const top = sol.steps[4].primitives[0];
-      const front = sol.steps[3].primitives.filter((p) => p.t === "line");
+      const top = sol.steps[5].primitives[0];
+      const front = sol.steps[4].primitives.filter((p) => p.t === "line");
       if (top.t !== "poly") throw new Error();
       const tan = Math.tan(((o.parallelToGenerator ? (Math.atan2(70, 30) * 180) / Math.PI : o.angle!) * Math.PI) / 180);
       const x0 = o.axisOffset ?? 0;
@@ -213,9 +213,29 @@ describe("conic sections of a cone", () => {
       expect(front.length).toBeGreaterThan(5);
     }
   });
-  it("a cylinder cut through its base is a partial ellipse; two exits are refused", () => {
+  it("a cylinder cut through its base is a partial ellipse", () => {
     expect(ok(solveSectionRound({ solid: "cylinder", diameter: 40, height: 70, angle: 40, axisHeight: 15 })).title).toBeTruthy();
-    expect(solveSectionRound({ solid: "cylinder", diameter: 40, height: 40, angle: 60, axisHeight: 20 }).ok).toBe(false);
+  });
+  it("a cylinder cut through both its base and its top is two arcs closed by two chords, on the cylinder surface", () => {
+    const i = { solid: "cylinder", diameter: 40, height: 40, angle: 60, axisHeight: 20 } as const;
+    const s = ok(solveSectionRound(i));
+    const top = s.steps[5].primitives[0];
+    if (top.t !== "poly") throw new Error();
+    const yOff = 20 + 15;
+    const tan = Math.tan((60 * Math.PI) / 180);
+    const zs = top.pts.map(([x, yy]) => {
+      expect(Math.hypot(x, yy + yOff)).toBeCloseTo(20, 6);
+      return 20 + x * tan;
+    });
+    zs.forEach((z) => { expect(z).toBeGreaterThan(-1e-4); expect(z).toBeLessThan(40 + 1e-4); });
+    // the two ends of each arc sit on the base and on the top, so the outline closes with a chord at each
+    expect(zs.filter((z) => Math.abs(z) < 1e-4)).toHaveLength(2);
+    expect(zs.filter((z) => Math.abs(z - 40) < 1e-4)).toHaveLength(2);
+    expect(s.steps[7].explanation).toMatch(/at the base and another at the top/);
+    // exact area = 2 * integral of sqrt(r^2 - x^2) dx over |x| <= 20 / tan 60, divided by cos 60 (the outline is a 5 degree polygon, so about 0.1 % low)
+    const area = Number(/area of about ([\d.]+)/.exec(s.steps[7].explanation)?.[1]);
+    expect(area).toBeGreaterThan(1739.01 * 0.995);
+    expect(area).toBeLessThan(1739.01 * 1.001);
   });
 });
 

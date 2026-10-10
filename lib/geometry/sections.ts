@@ -10,7 +10,7 @@ const dot = (c: Point): Primitive => ({ t: "circle", c, r: 0.9 });
 const GAP = 15; // distance of the solid from the VP, mm
 
 /** A corner of the section: plan coordinates (x, y), height z and distance s along the cutting line. */
-type Corner = { x: number; y: number; z: number; s: number };
+type Corner = { x: number; y: number; z: number; s: number; /** round solids: azimuth (deg) of the generator the point lies on */ az?: number };
 
 type Layout = {
   title: string;
@@ -33,6 +33,12 @@ type Layout = {
   shapeName: string;
   /** the curve leaves through the base: the cut face is closed by a straight chord there */
   open?: boolean;
+  /** a cylinder cut by a steep plane: two arcs, closed by a chord at the base and another at the top */
+  twoExits?: boolean;
+  /** round solids: the step that divides the base circle and draws the generators the cut points lie on */
+  generators?: { explanation: string; primitives: Primitive[] };
+  /** pyramids: part of the top view is drawn thin because the cutting plane will remove it */
+  thinEdges?: boolean;
 };
 
 function buildSteps(L: Layout): Solution {
@@ -52,6 +58,13 @@ function buildSteps(L: Layout): Solution {
   const outline = L.curve ?? L.corners;
   const maxZ = Math.max(...L.frontVerts.map((v) => v[1]));
   const half = Math.min(Math.max(Math.abs(L.xmin), Math.abs(L.xmax)) / Math.cos(th) + 12, (maxZ + 25) / Math.sin(th));
+  // The trace belongs in the front view: keep it from running far below XY (through the top view) or high above the solid.
+  let sLo = -half, sHi = half;
+  if (Math.sin(th) > 1e-6) {
+    sLo = Math.max(sLo, (-6 - L.k) / Math.sin(th));
+    sHi = Math.min(sHi, (maxZ + 10 - L.k) / Math.sin(th));
+  }
+  if (!(sHi - sLo > 1)) { sLo = -half; sHi = half; }
   const num = (i: number) => String(i + 1);
   const off = (p: Point): Point => [p[0] + 1.4, p[1] + 1.4];
 
@@ -72,33 +85,34 @@ function buildSteps(L: Layout): Solution {
   const steps: Step[] = [
     {
       title: "Given views",
-      explanation: "Draw the reference line XY. Draw the front view above it and the top view below it, with the solid standing on its base on the HP.",
+      explanation: `Draw the reference line XY. Draw the front view above it and the top view below it, with the solid standing on its base on the HP.${L.thinEdges ? " The thin parts of the edges in the top view are the parts that the cutting plane will remove." : ""}`,
       style: "outline",
       primitives: [line([L.xmin - 14, 0], [L.xmax + 14, 0]), text([L.xmin - 20, 2], "X"), text([L.xmax + 16, 2], "Y"), ...L.front, ...L.top],
     },
     {
       title: "Section plane",
-      explanation: `The cutting plane is perpendicular to the VP, so in the front view it is a straight line. Draw it inclined at ${L.theta}° to XY through the axis at ${L.k} mm above the base.`,
+      explanation: `The cutting plane is perpendicular to the VP, so in the front view it is a straight line. Draw it inclined at ${round(L.theta, 1)}° to XY ${L.x0 ? `through the point ${L.k} mm above the base and ${round(Math.abs(L.x0), 2)} mm ${L.x0 > 0 ? "right" : "left"} of the axis` : `through the axis at ${L.k} mm above the base`}.`,
       style: "centre",
-      primitives: [line([Q0[0] - u[0] * half, Q0[1] - u[1] * half], [Q0[0] + u[0] * half, Q0[1] + u[1] * half]), text([Q0[0] + u[0] * half + 1, Q0[1] + u[1] * half], "S.P.")],
+      primitives: [line([Q0[0] + u[0] * sLo, Q0[1] + u[1] * sLo], [Q0[0] + u[0] * sHi, Q0[1] + u[1] * sHi]), text([Q0[0] + u[0] * sHi + 1, Q0[1] + u[1] * sHi], "S.P.")],
     },
+    ...(L.generators ? [{ title: "Divide the base and draw the generators", explanation: L.generators.explanation, style: "construction" as const, primitives: L.generators.primitives }] : []),
     {
       title: "Mark the cut points",
       explanation: L.labelled
         ? `Mark each point where the cutting line crosses an edge of the solid in the front view and number them 1 to ${L.corners.length}. These are the corners of the section.`
-        : `Mark the points where the cutting line meets the generators of the solid in the front view. The more points you take, the smoother the curve.`,
+        : `Mark the points where the cutting line meets the generators in the front view. The more generators you use, the smoother the curve.`,
       style: "construction",
       primitives: [...L.corners.map((c) => dot(F(c))), ...labels(F)],
     },
     {
       title: "Project to the top view",
-      explanation: "Draw vertical projectors down from each point to the matching edge or generator in the top view. Each projector meets it at the top view of that point.",
+      explanation: `Draw vertical projectors down from each point to the matching ${L.generators ? "generator" : "edge"} in the top view. Each projector meets it at the top view of that point.`,
       style: "construction",
       primitives: [...L.corners.map((c) => line(F(c), T(c))), ...labels(T)],
     },
     {
       title: "Sectional top view",
-      explanation: "Join the points in order. This is the sectional top view: the part of the solid above the plane has been removed.",
+      explanation: `Join the points in order. This is the sectional top view: the part of the solid above the plane has been removed${L.thinEdges ? ", so only the thick edges and the section remain" : ""}.`,
       style: "outline",
       primitives: [{ t: "poly", pts: outline.map(T), closed: true }],
     },
@@ -110,7 +124,7 @@ function buildSteps(L: Layout): Solution {
     },
     {
       title: "True shape of the section",
-      explanation: `Along each projector, measure from X1Y1 the same distance the point is from XY in the top view. Join the points. The true shape is ${L.shapeName}${L.open ? ", closed by a straight line where the plane leaves through the base" : ""}, with an area of about ${round(area, 1)} mm².`,
+      explanation: `Along each projector, measure from X1Y1 the same distance the point is from XY in the top view. Join the points. The true shape is ${L.shapeName}${L.twoExits ? ", closed by a straight line at the base and another at the top where the plane leaves the cylinder" : L.open ? ", closed by a straight line where the plane leaves through the base" : ""}, with an area of about ${round(area, 1)} mm².`,
       style: "outline",
       primitives: [{ t: "poly", pts: outline.map(trueAt), closed: true }, ...labels(trueAt)],
     },
@@ -148,9 +162,23 @@ export function solveSectionPolyhedron(i: SectionPolyInput): Result {
       ? [{ t: "poly", closed: true, pts: [[xmin, 0], [xmax, 0], [xmax, h], [xmin, h]] }, ...[...inner].map(([x, vis]) => line([+x, 0], [+x, h], vis ? "outline" : "hidden"))]
       : [{ t: "poly", closed: true, pts: [[xmin, 0], [xmax, 0], [0, h]] }, ...[...inner].map(([x, vis]) => line([+x, 0], [0, h], vis ? "outline" : "hidden"))];
   const topBase = base.map(([x, y]) => [x, y - yOff] as Point);
+  // A pyramid's lateral edges run up to the apex, but the part above the cutting plane is removed later and a step cannot
+  // erase lines: so the part that will be removed is drawn thin (construction, which fades back) and the part that stays thick.
+  const tanT = Math.tan((i.angle * Math.PI) / 180);
+  const apexP: Point = [base.reduce((a, p) => a + p[0], 0) / n, base.reduce((a, p) => a + p[1], 0) / n];
+  const pyramidEdge = (p: Point): Primitive[] => {
+    const f = (x: number, z: number) => z - i.axisHeight - x * tanT; // > 0 above the plane
+    const fb = f(p[0], 0), fa = f(apexP[0], h);
+    const plan = (t: number): Point => [p[0] + (apexP[0] - p[0]) * t, p[1] + (apexP[1] - p[1]) * t - yOff];
+    const eps = 1e-7;
+    if (fb <= eps && fa <= eps) return [line(plan(0), plan(1))];
+    if (fb >= -eps && fa >= -eps) return [line(plan(0), plan(1), "construction")];
+    const t = fb / (fb - fa);
+    return fb < 0 ? [line(plan(0), plan(t)), line(plan(t), plan(1), "construction")] : [line(plan(0), plan(t), "construction"), line(plan(t), plan(1))];
+  };
   const top: Primitive[] = [
     { t: "poly", pts: topBase, closed: true },
-    ...(i.solid === "pyramid" ? topBase.map((p) => line(p, [0, -yOff])) : []),
+    ...(i.solid === "pyramid" ? base.flatMap((p) => pyramidEdge(p)) : []),
   ];
 
   const corners: Corner[] = cut.map((c) => ({ x: c.p[0], y: c.p[1], z: c.p[2], s: c.s }));
@@ -168,7 +196,7 @@ export function solveSectionPolyhedron(i: SectionPolyInput): Result {
     ],
     theta: i.angle, k: i.axisHeight, yOff, xmin, xmax,
     frontVerts: [...base.map((p) => [p[0], 0] as Point), ...(i.solid === "prism" ? base.map((p) => [p[0], h] as Point) : [[0, h] as Point])],
-    front, top, corners, labelled: true, shapeName: names[sides] ?? `a ${sides}-sided polygon`,
+    front, top, corners, labelled: true, thinEdges: top.some((p) => p.t === "line" && p.style === "construction"), shapeName: names[sides] ?? `a ${sides}-sided polygon`,
     solid: i.solid === "prism" ? { kind: "extrude", profile: base, height: h } : { kind: "pyramid", profile: base, height: h },
   });
   return { ok: true, solution: sol };
@@ -201,7 +229,7 @@ export function solveSectionRound(i: SectionRoundInput): Result {
     if (!(z >= -TOL && z <= h + TOL)) return null;
     const rho = i.solid === "cylinder" ? r : r * (1 - z / h);
     const x = rho * cx;
-    return { x, y: rho * sy, z, s: (x - x0) / Math.cos(th) };
+    return { x, y: rho * sy, z, s: (x - x0) / Math.cos(th), az: phiDeg };
   };
   // azimuths where the plane crosses the base (and the top, for a cylinder): the exact ends of an open curve
   const ends: number[] = [];
@@ -217,22 +245,29 @@ export function solveSectionRound(i: SectionRoundInput): Result {
   const walk = (step: number) => {
     const az = [...new Set([...Array.from({ length: Math.round(360 / step) }, (_, m) => m * step), ...ends.map((e) => Math.round(e * 1e6) / 1e6)])].sort((a, b) => a - b);
     const pts = az.map((a) => at(a));
-    if (pts.every(Boolean)) return { pts: pts as Corner[], open: false };
-    const start = pts.findIndex((q, m) => q && !pts[(m + pts.length - 1) % pts.length]);
-    if (start < 0) return null;
-    const run: Corner[] = [];
-    let m = start;
-    while (pts[m % pts.length]) run.push(pts[m++ % pts.length]!);
-    if (run.length !== pts.filter(Boolean).length) return null; // more than one piece
-    return { pts: run, open: true };
+    if (pts.every(Boolean)) return { pts: pts as Corner[], runs: 1, open: false };
+    const n = pts.length;
+    const runs: Corner[][] = [];
+    for (let m = 0; m < n; m++) {
+      if (!pts[m] || pts[(m + n - 1) % n]) continue;
+      const run: Corner[] = [];
+      for (let k = m; pts[k % n]; k++) run.push(pts[k % n]!);
+      runs.push(run);
+    }
+    if (!runs.length) return null;
+    // A cylinder cut by a steep plane that leaves through both the base and the top has two arcs (front and back);
+    // read in azimuth order, one ends at the base and the next starts there, so the closed outline adds both chords.
+    if (runs.length === 2 && i.solid === "cylinder") return { pts: runs.flat(), runs: 2, open: true };
+    if (runs.length !== 1) return null; // more than one piece
+    return { pts: runs[0], runs: 1, open: true };
   };
   const marks = walk(30), dense = walk(5);
-  if (!marks || !dense || marks.pts.length < 3) {
+  if (!marks || !dense || marks.pts.length < 3 || marks.runs !== dense.runs) {
     return { ok: false, reason: "The plane does not cut this solid in a single piece. Check the angle and the height of the cut." };
   }
-  const open = marks.open;
+  const open = marks.open, twoExits = marks.runs === 2;
   const kind =
-    i.solid === "cylinder" ? (open ? "part of an ellipse" : "an ellipse")
+    i.solid === "cylinder" ? (twoExits ? "two arcs of an ellipse" : open ? "part of an ellipse" : "an ellipse")
     : parabola || Math.abs(angle - alpha) < 0.01 ? "a parabola"
     : angle > alpha ? "a hyperbola"
     : open ? "part of an ellipse" : "an ellipse";
@@ -240,6 +275,22 @@ export function solveSectionRound(i: SectionRoundInput): Result {
   const front: Primitive[] = [{ t: "poly", closed: true, pts: i.solid === "cylinder" ? [[-r, 0], [r, 0], [r, h], [-r, h]] : [[-r, 0], [r, 0], [0, h]] }];
   const top: Primitive[] = [{ t: "circle", c: [0, -yOff], r }];
   const solidName = i.solid;
+  // the 12 equal divisions of the base circle, plus the generators through the points where the plane leaves the solid
+  const azs = [...Array.from({ length: 12 }, (_, m) => m * 30), ...marks.pts.map((c) => c.az ?? 0)]
+    .map((a) => Math.round(a * 1e6) / 1e6)
+    .sort((p, q) => p - q)
+    .filter((a, k, all) => k === 0 || a - all[k - 1] > 1e-6);
+  const extra = azs.length - 12;
+  const rimAt = (a: number): Point => [r * Math.cos((a * Math.PI) / 180), r * Math.sin((a * Math.PI) / 180) - yOff];
+  const frontXs = [...new Set(azs.map((a) => Math.round(r * Math.cos((a * Math.PI) / 180) * 1e4) / 1e4))];
+  const generators = {
+    explanation: `Divide the top-view circle into 12 equal parts of 30° and draw the radius to each division point. Project each division point up to the base line of the front view, and ${i.solid === "cone" ? "join it to the apex" : "draw a vertical line through it"}: these are the generators${i.solid === "cone" ? "" : " (in the top view each one is just a point on the circle)"}.${extra > 0 ? ` Add the generators through the points where the plane leaves the solid at the ${i.solid === "cylinder" ? "base or top" : "base"}.` : ""}`,
+    primitives: [
+      ...azs.map((a) => line([0, -yOff], rimAt(a), "construction")),
+      ...azs.map((a) => line(rimAt(a), [rimAt(a)[0], 0], "construction")),
+      ...frontXs.map((x) => line([x, 0], i.solid === "cone" ? [0, h] : [x, h], "construction")),
+    ],
+  };
   const where = x0 ? `crossing the height of ${i.axisHeight} mm above the base at ${Math.abs(x0)} mm ${x0 > 0 ? "right" : "left"} of the axis` : `passing through the axis at ${i.axisHeight} mm above the base`;
   const incl = parabola ? `parallel to the end generator (${round(alpha, 1)}° to the HP)` : `inclined at ${angle}° to the HP`;
   const sol = buildSteps({
@@ -255,7 +306,7 @@ export function solveSectionRound(i: SectionRoundInput): Result {
     theta: angle, k: i.axisHeight, x0, yOff, xmin: -r, xmax: r,
     frontVerts: i.solid === "cylinder" ? [[-r, 0], [r, 0], [r, h], [-r, h]] : [[-r, 0], [r, 0], [0, h]],
     front, top, corners: marks.pts, curve: dense.pts, labelled: false, shapeName: kind,
-    open,
+    open, twoExits, generators,
     solid: { kind: "revolve", profile: i.solid === "cylinder" ? [[0, 0], [r, 0], [r, h], [0, h]] : [[0, 0], [r, 0], [0, h]] },
   });
   return { ok: true, solution: sol };

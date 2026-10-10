@@ -158,7 +158,7 @@ export const Template = z.discriminatedUnion("template", [
     size: z.number().positive(),
     /** inclination of the surface to the HP, degrees */
     angle: z.number().min(1).max(89),
-    /** inclination to the VP of the side (or diameter) that lies in the HP, degrees. Leave out when only tilted to the HP. */
+    /** inclination to the VP, degrees, of the side that lies in the HP (edge rest) or of the top view of the line from the resting point to the centre (corner rest, or the diameter through the point of contact of a circle). Leave out when only tilted to the HP. */
     phi: z.number().min(1).max(89).optional(),
     rest: z.enum(["corner", "edge"]).default("edge"),
     /** "VP": the surface is inclined to the VP first (angle = surface to VP, phi = the side in the VP to the HP). Default "HP". */

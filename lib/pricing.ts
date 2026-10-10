@@ -36,7 +36,7 @@ export const PAID_PLANS: Record<PlanId, PaidPlan> = {
   exam: { id: "exam", kind: "order", amountPaise: 49900, accessDays: 90, label: "EasyUnderstand Exam pack (90 days)" },
 };
 
-export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && v in PAID_PLANS;
+export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && Object.hasOwn(PAID_PLANS, v);
 
 export const rupees = (paise: number) => "₹" + (paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 

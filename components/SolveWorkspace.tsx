@@ -12,6 +12,7 @@ export function SolveWorkspace({ initial, slug }: { initial: Solution | null; sl
   const [sol, setSol] = useState<Solution | null>(initial);
   const [loaded, setLoaded] = useState(!!initial);
   const [tab, setTab] = useState<"2d" | "3d">("2d");
+  const [unsaved, setUnsaved] = useState(false);
   const pathname = usePathname();
   const { me, loading } = useEntitlements();
   const unlocked = !loading && !!me?.canUse3D;
@@ -23,6 +24,7 @@ export function SolveWorkspace({ initial, slug }: { initial: Solution | null; sl
       const raw = sessionStorage.getItem("eu:custom");
       const parsed = raw ? Solution.safeParse(JSON.parse(raw)) : null;
       if (parsed?.success) setSol(parsed.data);
+      setUnsaved(sessionStorage.getItem("eu:custom-unsaved") === "1");
     } catch {}
     setLoaded(true);
   }, [initial]);
@@ -40,6 +42,7 @@ export function SolveWorkspace({ initial, slug }: { initial: Solution | null; sl
       <Link href="/" className="muted text-sm no-underline">← Back</Link>
       <h1>{sol.title}</h1>
       <p className="muted max-w-3xl">{sol.problem}</p>
+      {!initial && unsaved && <p role="status" className="callout">Solved, but we couldn't save this lesson to your history. Take a screenshot if you want to keep it.</p>}
       <div className="givens">
         {sol.givens.map((g) => (
           <span key={g.name} className="given">{g.name}<b>{g.value}</b></span>

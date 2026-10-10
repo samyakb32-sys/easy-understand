@@ -50,7 +50,17 @@ export function supabaseStore(): Store {
       fail("extendPro write", (await sb.from("entitlements").upsert(row, { onConflict: "user_id" })).error);
     },
     async setSubscriptionStatus(userId, subscriptionId, status) {
-      fail("setSubscriptionStatus", (await sb.from("entitlements").upsert({ user_id: userId, subscription_id: subscriptionId, subscription_status: status, updated_at: new Date().toISOString() }, { onConflict: "user_id" })).error);
+      // update, never upsert: a late event for an old subscription must not replace the current one
+      fail("setSubscriptionStatus", (await sb.from("entitlements").update({ subscription_status: status, updated_at: new Date().toISOString() }).eq("user_id", userId).eq("subscription_id", subscriptionId)).error);
+    },
+    async grantOrder(p, days, now) {
+      // one transaction in Postgres (supabase/migrations/0002_atomic_order.sql): payment row + pro_until move together
+      const { data, error } = await sb.rpc("apply_order_payment", {
+        p_user: p.userId, p_dedupe: p.dedupeKey, p_plan: p.planId, p_payment: p.paymentId ?? null, p_order: p.orderId ?? null,
+        p_amount: p.amount ?? null, p_days: days, p_now: now.toISOString(),
+      });
+      fail("grantOrder", error);
+      return data === true;
     },
     async getEntitlement(userId): Promise<EntitlementRow> {
       const { data, error } = await sb.from("entitlements").select("pro_until,subscription_id,subscription_status,plan_id").eq("user_id", userId).maybeSingle();

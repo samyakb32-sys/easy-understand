@@ -6,7 +6,7 @@ import { interpretEvent } from "@/lib/payments/events";
 import { verifyOrderSignature, verifySubscriptionSignature, verifyWebhookSignature } from "@/lib/payments/signature";
 import { MemoryStore } from "@/lib/payments/store";
 import { handleWebhook } from "@/lib/payments/webhook";
-import { FREE_DAILY_SOLVES, PAID_PLANS, PLANS, PRO_DAILY_SOLVES } from "@/lib/pricing";
+import { FREE_DAILY_SOLVES, PAID_PLANS, PLANS, PRO_DAILY_SOLVES, isPlanId } from "@/lib/pricing";
 
 const hmac = (secret: string, msg: string) => createHmac("sha256", secret).update(msg).digest("hex");
 const SECRET = "whsec_test";
@@ -128,6 +128,52 @@ describe("webhook handler", () => {
     vi.spyOn(store, "extendPro").mockRejectedValue(new Error("db down"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect((await send(store, sub("subscription.charged", "active", {}, { id: "pay_9", amount: 19900 }))).status).toBe(500);
+  });
+});
+
+describe("failure recovery and ordering", () => {
+  it("still grants the exam pack on the retry after the database failed mid-grant", async () => {
+    const store = new MemoryStore();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const real = store.extendPro.bind(store);
+    let calls = 0;
+    vi.spyOn(store, "extendPro").mockImplementation(async (...a) => { if (calls++ === 0) throw new Error("db blip"); return real(...a); });
+    expect((await send(store, orderPaid(PAID_PLANS.exam.amountPaise))).status).toBe(500);
+    expect(store.payments.size).toBe(0);
+    expect((await send(store, orderPaid(PAID_PLANS.exam.amountPaise))).status).toBe(200);
+    expect(store.ent.get(USER)!.pro_until).toBe(new Date(NOW.getTime() + 90 * DAY).toISOString());
+  });
+  it("ignores a late event for an old subscription once a new one is current", async () => {
+    const store = new MemoryStore();
+    const charged = (id: string) => sub("subscription.charged", "active", { id, notes: { user_id: USER, plan_id: "pro_monthly" } }, { id: `pay_${id}`, amount: 19900 });
+    await send(store, charged("sub_old"), { id: "e1" });
+    await store.setSubscriptionStatus(USER, "sub_old", "cancel_scheduled");
+    await send(store, charged("sub_new"), { id: "e2" });
+    const r = await send(store, sub("subscription.cancelled", "cancelled", { id: "sub_old" }), { id: "e3" });
+    expect(r.status).toBe(200);
+    expect(store.ent.get(USER)).toMatchObject({ subscription_id: "sub_new", subscription_status: "active" });
+  });
+  it("does not let a replayed older charge revive a halted subscription", async () => {
+    const store = new MemoryStore();
+    const charged = sub("subscription.charged", "active", {}, { id: "pay_9", amount: 19900 });
+    await send(store, charged, { id: "e1" });
+    await send(store, sub("subscription.halted", "halted"), { id: "e2" });
+    await send(store, charged, { id: "e3" });
+    expect(store.ent.get(USER)!.subscription_status).toBe("halted");
+    // a genuine later renewal still reactivates it
+    await send(store, sub("subscription.charged", "active", { current_end: 1_795_000_000 }, { id: "pay_10", amount: 19900 }), { id: "e4" });
+    expect(store.ent.get(USER)).toMatchObject({ subscription_status: "active", pro_until: new Date(1_795_000_000 * 1000).toISOString() });
+  });
+});
+
+describe("input validation", () => {
+  it("isPlanId rejects inherited object keys, and checkout answers 400", async () => {
+    for (const k of ["constructor", "__proto__", "toString", "hasOwnProperty", "free", ""]) expect(isPlanId(k)).toBe(false);
+    for (const k of Object.keys(PAID_PLANS)) expect(isPlanId(k)).toBe(true);
+    expect(await createCheckout({ userId: USER, planId: "constructor", rzp: fakeRazorpay(), store: new MemoryStore(), planIds: {} })).toMatchObject({ ok: false, status: 400 });
+  });
+  it("verifyCheckout answers 400 for a JSON null body", async () => {
+    expect(await verifyCheckout({ userId: USER, body: null as never, rzp: fakeRazorpay(), store: new MemoryStore(), keySecret: KEY })).toMatchObject({ ok: false, status: 400 });
   });
 });
 

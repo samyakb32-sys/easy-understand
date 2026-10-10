@@ -46,10 +46,14 @@ export function UploadSolver() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ image, mediaType: image ? "image/jpeg" : undefined, text: text || undefined }),
       });
-      const data = await res.json();
+      // a platform timeout or an oversized upload answers with plain text or HTML, not our JSON
+      const data = await res.json().catch(() => null);
+      if (!data) throw new Error(res.status === 413 ? "That photo is too large. Try a smaller photo, or type the problem." : "The server took too long or had a problem. Please try again in a moment.");
       if (!data.ok) { setCode(data.code ?? null); throw new Error(data.reason ?? "Could not solve this problem."); }
       const sol = Solution.parse(data.solution);
       sessionStorage.setItem("eu:custom", JSON.stringify(sol));
+      // Pro lessons are saved to history; if that failed the lesson page says so
+      if (data.saved === false) sessionStorage.setItem("eu:custom-unsaved", "1"); else sessionStorage.removeItem("eu:custom-unsaved");
       router.push("/solve/custom");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");

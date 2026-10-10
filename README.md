@@ -27,7 +27,7 @@ Sign-in and the database use **Supabase**; payments use **Razorpay**. Nothing he
 
 ### 1. Supabase (sign-in + database)
 1. Create a project at supabase.com. Copy the project URL and the `anon` key, and the `service_role` key (server only, never `NEXT_PUBLIC_`).
-2. In the SQL editor, run `supabase/migrations/0001_init.sql`.
+2. In the SQL editor, run `supabase/migrations/0001_init.sql`, then `supabase/migrations/0002_atomic_order.sql`, then `supabase/migrations/0003_solve_misses.sql`.
 3. Authentication > Providers: enable **Email** (magic link) and **Google** (create OAuth credentials in Google Cloud and paste the client id/secret).
 4. Authentication > URL Configuration: set the Site URL to your domain and add `https://YOUR-DOMAIN/auth/callback` (and `http://localhost:3000/auth/callback` for local work) to the redirect URLs.
 
@@ -41,7 +41,7 @@ Sign-in and the database use **Supabase**; payments use **Razorpay**. Nothing he
 - Pro is simply `entitlements.pro_until` being in the future. Subscription payments and the Exam pack only ever move that date forward, so a cancelled subscription keeps working to the end of the paid period and then lapses on its own.
 - Prices come from `lib/pricing.ts` on the server; the browser cannot choose an amount.
 - After Checkout the browser calls `/api/checkout/verify` (checks the payment signature and that the payment belongs to that student). The **webhook is the source of truth** for renewals, and both paths are idempotent, so retries or double delivery never double-count.
-- AI solves need a signed-in student and are counted per day in India time (`FREE_DAILY_SOLVES`, `PRO_DAILY_SOLVES` in `lib/pricing.ts`). A solve that fails is refunded.
+- AI solves need a signed-in student and are counted per day in India time (`FREE_DAILY_SOLVES`, `PRO_DAILY_SOLVES` in `lib/pricing.ts`). A solve is refunded in full when the failure is ours (Anthropic or network trouble, a timeout). When the AI cannot read the problem or says it is unsupported, the model call was still paid for, so those are refunded only for the first 5 misses a day (`MISS_REFUNDS_PER_DAY` in `app/api/solve/route.ts`).
 - Everything is tested with `npm test`: signatures, webhook handling, idempotency, checkout/verify, entitlements.
 
 ### Before you take real money

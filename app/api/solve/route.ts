@@ -10,6 +10,11 @@ import { currentUser } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
+/** Per day, how many attempts the model could not turn into a drawing are given back for free. */
+const MISS_REFUNDS_PER_DAY = 5;
+/** Must finish well inside maxDuration so we can still refund and answer in JSON before the platform kills the function. */
+const MODEL_DEADLINE_MS = 45_000;
+
 const Body = z.object({
   image: z.string().max(8_000_000).optional(), // base64, no data: prefix
   mediaType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]).optional(),
@@ -43,7 +48,7 @@ Templates:
 - {"template":"development_prism","base":"triangle"|"square"|"pentagon"|"hexagon","side":number,"height":number}   development of a regular prism
 - {"template":"solid_inclined","solid":"prism"|"pyramid"|"cone","base":"triangle"|"square"|"pentagon"|"hexagon","size":number,"height":number,"angle":number,"phi":number,"rest":"corner"|"edge"}
     projections of a solid standing on its base that is then tilted so its AXIS makes "angle" degrees (1 to 89) with the HP, the base touching the HP at a corner ("corner") or along an edge ("edge"). "size" is the base side (prism, pyramid) or the base diameter (cone); leave "base" out for a cone. "height" is the axis length. "phi" is optional: include it only when the problem also gives the inclination of the PLAN (top view) of the axis to the VP (1 to 89); omit it otherwise. "first":"HP"|"VP" is optional (default "HP"): use "VP" when the solid rests on the VP and its axis is inclined to the VP first; then "angle" is the axis inclined to the VP and "phi" the inclination of the FRONT VIEW of the axis to the HP. If the problem instead tilts a base edge or a generator to the HP, or gives the inclination of the axis itself (not its plan) to the VP, use "unsupported".
-- {"template":"plane_inclined","shape":"triangle"|"square"|"pentagon"|"hexagon"|"circle","size":number,"angle":number,"phi":number,"rest":"corner"|"edge"}   projections of a plane figure (lamina) whose SURFACE is inclined "angle" degrees to the HP, resting on a corner or a side (a circle rests on a point). "size" is the side, or the diameter of a circle. "first":"HP"|"VP" is optional (default "HP"): use "VP" when the problem puts the lamina with its surface inclined to the VP FIRST (side on the VP); then "angle" is the inclination of the SURFACE TO THE VP and "phi" the inclination of the side (in the VP) to the HP. "phi" is optional: include it only when a side lying in the HP (or, for a circle, the diameter in the HP) is also inclined to the VP by that many degrees (1 to 89); with rest "edge" phi belongs to that side, with rest "corner" it belongs to the plan of the line joining the resting corner to the centre. Any other VP condition is "unsupported".
+- {"template":"plane_inclined","shape":"triangle"|"square"|"pentagon"|"hexagon"|"circle","size":number,"angle":number,"phi":number,"rest":"corner"|"edge"}   projections of a plane figure (lamina) whose SURFACE is inclined "angle" degrees to the HP, resting on a corner or a side (a circle rests on a point). "size" is the side, or the diameter of a circle. "first":"HP"|"VP" is optional (default "HP"): use "VP" when the problem puts the lamina with its surface inclined to the VP FIRST (side on the VP); then "angle" is the inclination of the SURFACE TO THE VP and "phi" the inclination of the side (in the VP) to the HP. "phi" is optional: include it only when a side lying in the HP, or the top view of the line from the resting point to the centre, is also inclined to the VP by that many degrees (1 to 89); with rest "edge" phi belongs to that side, with rest "corner" it belongs to the top view of the line joining the resting corner to the centre, and for a circle it belongs to the top view of the diameter through the point of contact (the usual wording). If a circle problem instead gives the angle of the diameter that is PARALLEL to the HP (to the VP when first is VP), pass 90 minus that angle. Any other VP condition is "unsupported".
 - {"template":"interpenetration_cylinders","mainDiameter":number,"mainHeight":number,"branchDiameter":number,"axisHeight":number}   a vertical cylinder pierced by a smaller (or equal) horizontal cylinder whose axis meets the vertical axis at right angles and is parallel to the VP; draw the curves of intersection. "axisHeight" (height of the branch axis above the base) is optional. Other penetrations (prism, cone, offset axes) are "unsupported".
 - {"template":"isometric_composite","scale":"isometric"|"true","parts":[...]}   isometric view of two to four solids stacked on one vertical axis, listed from the BOTTOM up. Each part is one of:
     {"kind":"prism","base":"rectangle"|"triangle"|"square"|"pentagon"|"hexagon","side":number,"width":number,"height":number}  (width only for a rectangle)
@@ -79,31 +84,48 @@ export async function POST(req: Request) {
   const gated = solverNeedsLogin();
   if (gated) {
     if (!serviceRoleConfigured()) return fail({ ok: false, reason: "Accounts aren't set up on this server yet, so the AI solver is switched off." }, 503);
-    const user = await currentUser();
-    if (!user) return fail({ ok: false, code: "login_required", reason: "Sign in to solve your own problems. The example lessons need no account." }, 401);
-    userId = user.id;
-    const ent = await loadEntitlements(user.id);
-    isPro = ent.isPro;
-    const { data, error } = await supabaseAdmin().rpc("consume_solve", { p_user: user.id, p_limit: ent.dailyLimit });
-    if (error) {
-      console.error("consume_solve failed", error);
+    try {
+      const user = await currentUser();
+      if (!user) return fail({ ok: false, code: "login_required", reason: "Sign in to solve your own problems. The example lessons need no account." }, 401);
+      userId = user.id;
+      const ent = await loadEntitlements(user.id);
+      isPro = ent.isPro;
+      const { data, error } = await supabaseAdmin().rpc("consume_solve", { p_user: user.id, p_limit: ent.dailyLimit });
+      if (error) {
+        console.error("consume_solve failed", error);
+        return fail({ ok: false, reason: "Something went wrong. Please try again." }, 500);
+      }
+      if (!data) {
+        return fail({ ok: false, code: "limit_reached", reason: ent.isPro ? "You've reached today's fair-use limit. It resets at midnight India time." : `You've used your ${ent.dailyLimit} free solves for today. Upgrade to Pro for unlimited solves, or come back tomorrow.` }, 429);
+      }
+    } catch (e) {
+      // always answer in JSON: the browser parses the reply, and a bare 500 page would show the student a parse error
+      console.error("solve: could not check the account", e);
       return fail({ ok: false, reason: "Something went wrong. Please try again." }, 500);
     }
-    if (!data) {
-      return fail({ ok: false, code: "limit_reached", reason: ent.isPro ? "You've reached today's fair-use limit. It resets at midnight India time." : `You've used your ${ent.dailyLimit} free solves for today. Upgrade to Pro for unlimited solves, or come back tomorrow.` }, 429);
-    }
   }
-  // a failed attempt should not cost the student a solve
+  // A failure that is ours (Anthropic or network trouble, a timeout) gives the solve back in full.
   const refund = async () => {
     if (userId) await supabaseAdmin().rpc("refund_solve", { p_user: userId }).then(() => {}, (e) => console.error("refund failed", e));
   };
   const give = async (body: Fail, status: number) => { await refund(); return fail(body, status); };
+  // The model has already been paid for when it says "unsupported" or returns something we cannot draw, so those only
+  // get the solve back while a small daily allowance of misses lasts. Otherwise junk input would be free and unlimited.
+  const miss = async (body: Fail, status: number) => {
+    let kept = true;
+    if (userId) {
+      const r = await supabaseAdmin().rpc("refund_miss", { p_user: userId, p_max: MISS_REFUNDS_PER_DAY });
+      if (r.error) console.error("refund_miss failed", r.error);
+      kept = !r.error && r.data === true;
+    }
+    return fail(kept || !userId ? body : { ...body, reason: `${body.reason} This attempt used one of today's solves.` }, status);
+  };
 
   const content: Anthropic.ContentBlockParam[] = [];
   if (image) content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: image } });
   content.push({ type: "text", text: text?.trim() ? `Problem text: ${text.trim()}` : "Classify the problem in this image." });
 
-  const client = new Anthropic();
+  const client = new Anthropic({ maxRetries: 1 });
   try {
     const response = await client.beta.messages.create({
       model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5",
@@ -111,30 +133,37 @@ export async function POST(req: Request) {
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       output_config: { effort: "medium" },
-      system: SYSTEM,
+      system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content }],
-    });
+    }, { signal: AbortSignal.timeout(MODEL_DEADLINE_MS) });
     const raw = response.content.find((b) => b.type === "text")?.text ?? "";
     const json = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
     const reply = Reply.safeParse(JSON.parse(json));
-    if (!reply.success) return give({ ok: false, reason: "I couldn't understand that problem's numbers. Try a clearer photo, or type the problem." }, 422);
-    if (reply.data.template === "unsupported") return give({ ok: false, reason: reply.data.reason }, 422);
+    if (!reply.success) return miss({ ok: false, reason: "I couldn't understand that problem's numbers. Try a clearer photo, or type the problem." }, 422);
+    if (reply.data.template === "unsupported") return miss({ ok: false, reason: reply.data.reason }, 422);
 
     const result = solveTemplate(reply.data);
-    if (!result.ok) return give({ ok: false, reason: result.reason }, 422);
+    if (!result.ok) return miss({ ok: false, reason: result.reason }, 422);
 
     // Pro students keep a history of their lessons
     let savedId: string | null = null;
     if (userId && isPro) {
-      const { data } = await supabaseAdmin().from("lessons").insert({ user_id: userId, title: result.solution.title, solution: result.solution }).select("id").single();
+      const { data, error } = await supabaseAdmin().from("lessons").insert({ user_id: userId, title: result.solution.title, solution: result.solution }).select("id").single();
+      if (error) console.error("saving the lesson failed", error);
       savedId = data?.id ?? null;
     }
-    return NextResponse.json({ ...result, savedId }, { headers: { "Cache-Control": "no-store" } });
+    // the student still gets the lesson; `saved: false` lets the page say it was not kept in their history
+    return NextResponse.json({ ...result, savedId, saved: userId && isPro ? savedId !== null : undefined }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return give({ ok: false, reason: "Too many requests right now. Please try again in a minute." }, 429);
     if (e instanceof Anthropic.AuthenticationError) return give({ ok: false, reason: "The AI solver's API key is invalid." }, 503);
-    if (e instanceof SyntaxError) return give({ ok: false, reason: "The AI gave an unreadable answer. Please try again." }, 502);
+    if (e instanceof Anthropic.APIUserAbortError || e instanceof Anthropic.APIConnectionTimeoutError) {
+      return give({ ok: false, reason: "The AI took too long to answer. Please try again." }, 504);
+    }
+    // an unreadable answer or a solver crash is the model's output not being usable, not an outage: it counts as a miss
+    if (e instanceof SyntaxError) return miss({ ok: false, reason: "The AI gave an unreadable answer. Please try again." }, 502);
     console.error("solve failed", e);
-    return give({ ok: false, reason: "Something went wrong while solving. Please try again." }, 500);
+    const body: Fail = { ok: false, reason: "Something went wrong while solving. Please try again." };
+    return e instanceof Anthropic.APIError ? give(body, 500) : miss(body, 500);
   }
 }

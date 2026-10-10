@@ -22,13 +22,15 @@ export function solveConic(d: number, e: number): Result {
   const xv = d / (1 + e);
   const xEnd = kind === "ellipse" ? d / (1 - e) : xv + 2.5 * d;
   const yAt = (x: number) => Math.sqrt(Math.max(0, e * e * x * x - (x - d) ** 2));
-  const spaced = (i: number, n: number) => (kind === "ellipse" ? xv + ((xEnd - xv) * (1 - Math.cos((Math.PI * i) / n))) / 2 : xv + ((xEnd - xv) * i) / n);
+  // `smooth` packs the curve points towards V (x grows with the square of i, so y is about even), otherwise the first chords from the vertex of a parabola or hyperbola are nearly vertical and V draws as a kink
+  const spaced = (i: number, n: number, smooth = false) =>
+    kind === "ellipse" ? xv + ((xEnd - xv) * (1 - Math.cos((Math.PI * i) / n))) / 2 : xv + (xEnd - xv) * (smooth ? (i / n) ** 2 : i / n);
 
   const M = 8;
   const marks = Array.from({ length: M }, (_, k) => spaced(k + 1, M + 1));
   const N = 80;
   const upper: Point[] = Array.from({ length: N + 1 }, (_, k) => {
-    const x = spaced(k, N);
+    const x = spaced(k, N, true);
     return [x, yAt(x)] as Point;
   });
   const lower: Point[] = upper.map(([x, y]) => [x, -y] as Point).reverse();
@@ -131,7 +133,9 @@ export function solvePyramidDevelopment(base: RegularBase, s: number, h: number)
   if (n * step >= 2 * Math.PI) return { ok: false, reason: "These sizes do not make a closed pyramid." };
   const gap = 25;
   const Ob: Point = [R, 0]; // centre of the base in the top view
-  const vertex = (k: number): Point => [Ob[0] + R * Math.cos((2 * Math.PI * k) / n + Math.PI / 2), Ob[1] + R * Math.sin((2 * Math.PI * k) / n + Math.PI / 2)];
+  // one base side parallel to XY (for an even n a corner would point up and the square would stand on its corner)
+  const turn = Math.PI / 2 + (n % 2 === 0 ? Math.PI / n : 0);
+  const vertex = (k: number): Point => [Ob[0] + R * Math.cos((2 * Math.PI * k) / n + turn), Ob[1] + R * Math.sin((2 * Math.PI * k) / n + turn)];
   const V = Array.from({ length: n }, (_, k) => vertex(k));
   const x0 = 2 * R + gap;
   const O: Point = [x0 + e, e + 5];
@@ -146,13 +150,13 @@ export function solvePyramidDevelopment(base: RegularBase, s: number, h: number)
     { title: "True length of a slant edge", explanation: `In the top view the edges are shortened. Make a right triangle with one leg = ${round(R)} mm (centre to corner) and the other leg = height ${h} mm. The hypotenuse is the true edge length: ${round(e)} mm.`, style: "construction", primitives: [line([0, ty], [R, ty]), line([R, ty], [R, ty + h]), line([0, ty], [R, ty + h], "outline"), text([R / 2 - 3, ty - 5], `${round(R)}`), text([R + 2, ty + h / 2], `${h}`), text([R / 4 - 14, ty + h / 2 + 8], `${round(e)}`)] },
     { title: "Swing the arc", explanation: `Mark a centre O. With radius ${round(e)} mm (the true edge length) swing a long arc.`, style: "construction", primitives: [{ t: "arc", c: O, r: e, from: a0 - 4, to: a1 + 4 }, text([O[0] - 2, O[1] + 3], "O")] },
     { title: "Step off the base sides", explanation: `From a point on the arc, step off ${n} chords, each equal to the base side ${s} mm. Join the first and last to O.`, style: "construction", primitives: [...P.slice(0, -1).map((p, k) => line(p, P[k + 1], "outline")), line(O, P[0], "outline"), line(O, P[n], "outline")] },
-    { title: "Join to the apex", explanation: `Join every chord end to O. These ${n} triangles are the faces of the ${name}. Together with the base they form the full development.`, style: "outline", primitives: P.slice(1, -1).map((p) => line(O, p)) },
+    { title: "Join to the apex", explanation: `Join every chord end to O. These ${n} triangles are the faces of the ${name}: together they are the development of its lateral surface.`, style: "outline", primitives: P.slice(1, -1).map((p) => line(O, p)) },
   ];
   return {
     ok: true,
     solution: {
       title: `Development of a ${name}`,
-      problem: `A ${name} has a base side of ${s} mm and an axis of ${h} mm. Draw its projections and the development of its lateral surface.`,
+      problem: `A ${name} has a base side of ${s} mm and an axis of ${h} mm. Draw its top view and the development of its lateral surface.`,
       givens: [{ name: "Base side", value: `${s} mm` }, { name: "Axis", value: `${h} mm` }],
       steps,
       solid: { kind: "pyramid", profile: V.map((v) => [v[0] - R, v[1]] as Point), height: h },

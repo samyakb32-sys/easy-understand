@@ -1,7 +1,15 @@
 /** Which integrations are configured. Everything degrades to a clear message when a key is missing. */
 export const supabaseUrl = () => process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 export const supabaseAnonKey = () => process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-export const supabaseConfigured = () => !!(supabaseUrl() && supabaseAnonKey());
+/** A pasted "myproj.supabase.co" (no https://) makes the Supabase clients throw on every request, so treat it as not configured. */
+const httpUrl = (v: string) => {
+  try {
+    return /^https?:$/.test(new URL(v).protocol);
+  } catch {
+    return false;
+  }
+};
+export const supabaseConfigured = () => !!(httpUrl(supabaseUrl()) && supabaseAnonKey());
 export const serviceRoleConfigured = () => supabaseConfigured() && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const razorpayConfigured = () => !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);

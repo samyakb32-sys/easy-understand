@@ -58,7 +58,8 @@ export type VerifyBody = { razorpay_payment_id?: unknown; razorpay_order_id?: un
  * the checkout record proves the payment belongs to this student. The webhook stays the source of truth for renewals.
  */
 export async function verifyCheckout(args: { userId: string; body: VerifyBody; rzp: RazorpayLike; store: Store; keySecret: string; now?: Date }): Promise<{ ok: true; pro: boolean; pending: boolean } | Fail> {
-  const { userId, body, rzp, store, keySecret } = args;
+  const { userId, rzp, store, keySecret } = args;
+  const body: VerifyBody = args.body && typeof args.body === "object" ? args.body : {};
   const s = (v: unknown) => (typeof v === "string" ? v : "");
   const paymentId = s(body.razorpay_payment_id), signature = s(body.razorpay_signature);
   const orderId = s(body.razorpay_order_id), subId = s(body.razorpay_subscription_id);

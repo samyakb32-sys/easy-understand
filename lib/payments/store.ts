@@ -22,7 +22,14 @@ export interface Store {
   recordPayment(p: PaymentRecord): Promise<boolean>;
   /** pro_until becomes the later of its current value and `until` */
   extendPro(userId: string, until: Date, patch?: { subscriptionId?: string; subscriptionStatus?: string; planId?: string }): Promise<void>;
+  /** only changes the row while `subscriptionId` is still the student's current subscription; never adopts a new id */
   setSubscriptionStatus(userId: string, subscriptionId: string, status: string): Promise<void>;
+  /**
+   * Atomically records an exam-pack payment AND extends pro_until by `days` (from the later of `now` and the current
+   * pro_until). Returns false, changing nothing, if the dedupeKey was already seen. All or nothing, so a failure can
+   * be retried safely.
+   */
+  grantOrder(p: PaymentRecord & { planId: string }, days: number, now: Date): Promise<boolean>;
   getEntitlement(userId: string): Promise<EntitlementRow>;
   userForSubscription(subscriptionId: string): Promise<string | null>;
 }
@@ -48,8 +55,24 @@ export class MemoryStore implements Store {
     });
   }
   async setSubscriptionStatus(userId: string, subscriptionId: string, status: string) {
-    const cur = this.ent.get(userId) ?? { pro_until: null, subscription_id: null, subscription_status: null, plan_id: null };
-    this.ent.set(userId, { ...cur, subscription_id: subscriptionId, subscription_status: status });
+    const cur = this.ent.get(userId);
+    if (!cur || cur.subscription_id !== subscriptionId) return;
+    this.ent.set(userId, { ...cur, subscription_status: status });
+  }
+  async grantOrder(p: PaymentRecord & { planId: string }, days: number, now: Date) {
+    if (this.payments.has(p.dedupeKey)) return false;
+    const before = this.ent.get(p.userId);
+    this.payments.set(p.dedupeKey, p);
+    try {
+      const base = Math.max(now.getTime(), before?.pro_until ? new Date(before.pro_until).getTime() : 0);
+      await this.extendPro(p.userId, new Date(base + days * 86_400_000), { planId: p.planId });
+    } catch (e) {
+      // a real database rolls the whole transaction back
+      this.payments.delete(p.dedupeKey);
+      if (before) this.ent.set(p.userId, before); else this.ent.delete(p.userId);
+      throw e;
+    }
+    return true;
   }
   async getEntitlement(userId: string) { return this.ent.get(userId) ?? null; }
   async userForSubscription(subscriptionId: string) {

@@ -89,7 +89,7 @@ function build(spec: Spec): Built {
   return { shape: { kind: "poly", verts, faces, apex: n }, pivot, minX: 0, maxX, depthMax };
 }
 
-type Views = { fv: Primitive[]; tv: Primitive[]; /** key 3D points after the turns, in a fixed order */ keys: Vec3[]; minX: number; maxX: number; minY: number };
+type Views = { fv: Primitive[]; tv: Primitive[]; /** key 3D points after the turns, in a fixed order */ keys: Vec3[]; minX: number; maxX: number; minY: number; /** cone only: the apex projects inside the base ellipse in the top view, so no tangents exist */ tvApexInside?: boolean };
 
 /** Visible/hidden runs of a closed sampled curve. */
 function runs(pts: Point[], vis: boolean[]): Primitive[] {
@@ -126,7 +126,8 @@ function views(b: Built, a: number, dx: number, phi = 0, dx2 = 0, dy = 0): Views
     return [x + dx2, y + dy, q[2]];
   };
   const all: Vec3[] = [];
-  const done = (fv: Primitive[], tv: Primitive[], keys: Vec3[]): Views => ({ fv, tv, keys, minX: Math.min(...all.map((v) => v[0])), maxX: Math.max(...all.map((v) => v[0])), minY: Math.min(...all.map((v) => v[1])) });
+  let tvApexInside = false;
+  const done = (fv: Primitive[], tv: Primitive[], keys: Vec3[]): Views => ({ fv, tv, keys, tvApexInside, minX: Math.min(...all.map((v) => v[0])), maxX: Math.max(...all.map((v) => v[0])), minY: Math.min(...all.map((v) => v[1])) });
   const fvP = (v: Vec3): Point => [v[0], v[2]];
   const tvP = (v: Vec3): Point => [v[0], -v[1]];
   const fv: Primitive[] = [];
@@ -215,9 +216,12 @@ function views(b: Built, a: number, dx: number, phi = 0, dx2 = 0, dy = 0): Views
     if (diffs.every((d) => Math.abs(d) < Math.PI / 2 - 1e-6)) {
       out.push(line(T, pts[diffs.indexOf(Math.max(...diffs))], "outline"), line(T, pts[diffs.indexOf(Math.min(...diffs))], "outline"));
     } else {
-      out.push(line(T, pts[N / 4], "outline"), line(T, pts[(3 * N) / 4], "outline"));
+      // The apex projects inside the base ellipse, so no tangent exists and the whole ellipse is the outline.
+      // A cone seen along its axis is just a circle with the apex at its centre.
+      if (comp === 2) tvApexInside = true;
+      if (!baseVis) out.push({ t: "circle", c: T, r: 0.9 });
     }
-    out.push(line(T, C, "centre"));
+    if (Math.hypot(T[0] - C[0], T[1] - C[1]) > 1e-6) out.push(line(T, C, "centre"));
   };
   side(fvP, 1, fv);
   side(tvP, 2, tv);
@@ -230,12 +234,14 @@ const POLY_NAME = (n: number) => ({ 3: "triangle", 4: "square", 5: "pentagon", 6
 export type TiltInput =
   | { solid: "prism" | "pyramid"; base: RegularBase; side: number; height: number; angle: number; rest: "corner" | "edge"; /** plan of the axis to the VP, degrees */ phi?: number }
   | { solid: "cone"; diameter: number; height: number; angle: number; phi?: number }
-  | { shape: RegularBase | "circle"; size: number; angle: number; rest: "corner" | "edge"; /** the side (or diameter) in the HP, inclined to the VP, degrees */ phi?: number };
+  | { shape: RegularBase | "circle"; size: number; angle: number; rest: "corner" | "edge"; /** the side in the HP (or, for a corner or a circle, the top view of the line from the resting point to the centre), inclined to the VP, degrees */ phi?: number };
 
 export function solveTilted(input: TiltInput): Result {
   const isPlane = "shape" in input;
   /** a lamina resting on a corner: the VP angle belongs to the line from that corner to the centre (the line of greatest slope) */
   const byCorner = "shape" in input && input.shape !== "circle" && input.rest === "corner";
+  /** a circle rests on a point of its circumference, so the VP angle belongs to the diameter through that point, as for a corner */
+  const byPoint = byCorner || ("shape" in input && input.shape === "circle");
   const theta = input.angle;
   if (!(theta > 0 && theta < 90)) return { ok: false, reason: "The inclination must be between 0° and 90°." };
   const phiDeg = input.phi ?? 0;
@@ -250,9 +256,9 @@ export function solveTilted(input: TiltInput): Result {
     const name = input.shape === "circle" ? "circle" : input.shape;
     title = `Projection of a ${name} lamina${phiDeg ? " inclined to HP and VP" : ""}`;
     problem = input.shape === "circle"
-      ? `A circular lamina of diameter ${input.size} mm rests on the HP on a point of its circumference, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and the diameter in the HP inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`
-      : `A ${name} lamina of side ${input.size} mm rests on the HP on ${input.rest === "edge" ? "one side" : "one corner"}, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and ${byCorner ? "the plan of the line joining that corner to the centre" : "that side"} inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`;
-    givens = [{ name: input.shape === "circle" ? "Diameter" : "Side", value: `${input.size} mm` }, { name: "Surface inclined to HP", value: `${theta}°` }, ...(phiDeg ? [{ name: input.shape === "circle" ? "Diameter to VP" : byCorner ? "Corner-to-centre line to VP" : "Side to VP", value: `${phiDeg}°` }] : [])];
+      ? `A circular lamina of diameter ${input.size} mm rests on the HP on a point of its circumference, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and the top view of the diameter through that point inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`
+      : `A ${name} lamina of side ${input.size} mm rests on the HP on ${input.rest === "edge" ? "one side" : "one corner"}, with its surface inclined at ${theta}° to the HP${phiDeg ? ` and ${byCorner ? "the top view of the line joining that corner to the centre" : "that side"} inclined at ${phiDeg}° to the VP` : ""}. Draw its projections.`;
+    givens = [{ name: input.shape === "circle" ? "Diameter" : "Side", value: `${input.size} mm` }, { name: "Surface inclined to HP", value: `${theta}°` }, ...(phiDeg ? [{ name: input.shape === "circle" ? "Diameter through the point to VP" : byCorner ? "Corner-to-centre line to VP" : "Side to VP", value: `${phiDeg}°` }] : [])];
   } else if (input.solid === "cone") {
     spec = { solid: "cone", r: input.diameter / 2, height: input.height };
     title = phiDeg ? "Cone with its axis inclined to the HP and VP" : "Cone with its axis inclined to the HP";
@@ -276,7 +282,7 @@ export function solveTilted(input: TiltInput): Result {
   const dx = built.maxX + 30 - probe.minX;
   const fin = views(built, a, dx);
   // a lamina's tilt edge starts perpendicular to XY, so it turns through 90 - phi; the corner-to-centre line starts along XY, so phi itself
-  const phi = rad(isPlane && !byCorner ? 90 - phiDeg : phiDeg);
+  const phi = rad(isPlane && !byPoint ? 90 - phiDeg : phiDeg);
   const dx2 = fin.maxX + 30 - views(built, a, dx, phi).minX;
   const probe2 = views(built, a, dx, phi, dx2);
   const dy = GAP - probe2.minY;
@@ -323,14 +329,22 @@ export function solveTilted(input: TiltInput): Result {
     const dirx = apex[0] - centre[0], dirz = apex[2] - centre[2];
     const sdown = centre[2] / (dirz / Math.hypot(dirx, dirz));
     const L = Math.hypot(dirx, dirz);
-    const q: Point = [centre[0] - (dirx / L) * sdown, 0];
-    angleMarks.push(line(q, [apex[0], apex[2]], "construction"), { t: "arc", c: q, r: 14, from: 0, to: theta, style: "construction" }, text([q[0] + 16, 3], `${theta}°`));
+    // A shallow axis only meets XY far away (about 1/sin(angle) times its length), which would shrink the whole drawing to fit.
+    // Then measure the angle against a line parallel to XY through the base centre instead.
+    const far = sdown > 2 * L;
+    const q: Point = far ? [centre[0], centre[2]] : [centre[0] - (dirx / L) * sdown, 0];
+    angleMarks.push(
+      line(q, [apex[0], apex[2]], "construction"),
+      ...(far ? [line([q[0] - 5, q[1]], [q[0] + L + 8, q[1]], "construction")] : []),
+      { t: "arc", c: q, r: far ? Math.min(14, L / 2) : 14, from: 0, to: theta, style: "construction" },
+      text([q[0] + 16, q[1] + 3], `${theta}°`),
+    );
   }
   steps.push({
     title: isPlane ? `Tilt the front view to ${theta}°` : `Tilt the front view so the axis is at ${theta}°`,
     explanation: isPlane
       ? `Redraw the front view with its resting point on XY and the line of the lamina inclined at ${theta}° to XY. Its length stays the same.`
-      : `Redraw the front view, keeping the same size and shape, so that its axis makes ${theta}° with XY and the point of the base that touches the HP is on XY. Parts that are behind are dotted.`,
+      : `Redraw the front view, keeping the same size and shape, so that its axis makes ${theta}° with XY and the point of the base that touches the HP is on XY. Parts that are hidden from view are dotted.`,
     style: "outline",
     primitives: [...angleMarks, ...fin.fv],
   });
@@ -360,7 +374,7 @@ export function solveTilted(input: TiltInput): Result {
     title: "Draw the final top view",
     explanation: isPlane
       ? "Join the new points in order with thick lines. The top view is shortened in the direction of tilt but keeps its full width."
-      : `Join the new points with thick lines. Edges that are hidden by the solid are dotted.${spec.solid === "cone" ? " Draw two tangents from the apex to the base ellipse as the outline." : ""}`,
+      : `Join the new points with thick lines. Edges that are hidden by the solid are dotted.${spec.solid !== "cone" ? "" : fin.tvApexInside ? " The apex falls inside the base ellipse, so no tangents can be drawn from it and the whole ellipse is the outline." : " Draw two tangents from the apex to the base ellipse as the outline."}`,
     style: "outline",
     primitives: fin.tv,
   });
@@ -375,17 +389,16 @@ export function solveTilted(input: TiltInput): Result {
     const sh = built.shape;
     let turnMark: Primitive[];
     if (sh.kind === "plane") {
-      const pair: Vec3[] = input_isCircle(spec)
-        ? [sh.corners[1], sh.corners[3]]
-        : byCorner
-          ? [built.pivot, mean(sh.corners)]
-          : sh.corners.filter((c) => c[0] >= built.maxX - 1e-9).slice(0, 2);
+      const pair: Vec3[] = byPoint
+        ? [built.pivot, mean(sh.corners)]
+        : sh.corners.filter((c) => c[0] >= built.maxX - 1e-9).slice(0, 2);
       let A = turn(pair[0]), B = turn(pair[1]);
       if (B[0] < A[0]) [A, B] = [B, A];
       const ang = (Math.atan2(B[1] - A[1], B[0] - A[0]) * 180) / Math.PI;
       const len = Math.hypot(B[0] - A[0], B[1] - A[1]);
       turnMark = [
         line([A[0] - 5, A[1]], [A[0] + len + 8, A[1]], "construction"),
+        ...(byPoint ? [line(A, B, "construction")] : []),
         { t: "arc", c: A, r: Math.min(14, len / 2), from: Math.min(0, ang), to: Math.max(0, ang), style: "construction" },
         text([A[0] + 16, A[1] + (ang > 0 ? 3 : -5)], `${phiDeg}°`),
       ];
@@ -406,7 +419,7 @@ export function solveTilted(input: TiltInput): Result {
     }
     steps.push({
       title: `Turn the top view through ${phiDeg}°`,
-      explanation: isPlane ? `Copy the final top view to a new place, turned so the ${byCorner ? "line joining the resting corner to the centre" : "side (or diameter) that lies in the HP"} makes ${phiDeg}° with XY. Its shape does not change.` : `Copy the final top view to a new place, turned so the plan of the axis makes ${phiDeg}° with XY. Its size and shape do not change, and the solid still touches the HP at the same point. Edges that are hidden are dotted.`,
+      explanation: isPlane ? `Copy the final top view to a new place, turned so the ${input_isCircle(spec) ? "top view of the diameter through the resting point" : byCorner ? "top view of the line joining the resting corner to the centre" : "side that lies in the HP"} makes ${phiDeg}° with XY. Its shape does not change.` : `Copy the final top view to a new place, turned so the plan of the axis makes ${phiDeg}° with XY. Its size and shape do not change, and the solid still touches the HP at the same point. Edges that are hidden are dotted.`,
       style: "outline",
       primitives: [...turnMark, ...fin2.tv],
     });
@@ -423,7 +436,9 @@ export function solveTilted(input: TiltInput): Result {
     });
     steps.push({
       title: "Draw the final front view",
-      explanation: "Join the new points with thick lines, dotting the hidden edges. The solid is now inclined to both the HP and the VP.",
+      explanation: isPlane
+        ? "Join the new points in order with thick lines. The lamina is now inclined to both the HP and the VP."
+        : "Join the new points with thick lines, dotting the hidden edges. The solid is now inclined to both the HP and the VP.",
       style: "outline",
       primitives: fin2.fv,
     });
@@ -448,9 +463,10 @@ const SWAP: Record<string, string> = {
   "Top view": "Front view", "Front view": "Top view", "Top-view": "Front-view", "Front-view": "Top-view",
   HP: "VP", VP: "HP", upward: "downward", downward: "upward", "projectors down": "projectors up", "projectors up": "projectors down",
   height: "depth", depth: "height", heights: "depths", depths: "heights",
+  "Project up": "Project down", "Project down": "Project up", "directly over its centre": "directly in front of its centre",
   "plan of the axis": "front view of the axis", "Plan of the axis": "Front view of the axis", "plan of axis": "front view of axis", "Plan of axis": "Front view of axis",
 };
-const swapWords = (s: string) => s.replace(/projectors (?:up|down)|\b[Pp]lan of (?:the )?axis\b|\b(?:[Tt]op|[Ff]ront)[ -]view\b|\bHP\b|\bVP\b|\bupward\b|\bdownward\b|\b(?:height|depth)s?\b/g, (m) => SWAP[m] ?? m);
+const swapWords = (s: string) => s.replace(/projectors (?:up|down)|\bProject (?:up|down)\b|directly over its centre|\b[Pp]lan of (?:the )?axis\b|\b(?:[Tt]op|[Ff]ront)[ -]view\b|\bHP\b|\bVP\b|\bupward\b|\bdownward\b|\b(?:height|depth)s?\b/g, (m) => SWAP[m] ?? m);
 
 const flip = (p: Primitive): Primitive => {
   const f = (q: Point): Point => [q[0], -q[1]];

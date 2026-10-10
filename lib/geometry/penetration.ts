@@ -145,7 +145,7 @@ export function solveCylinderPenetration(i: CylinderPenetration): Result {
   return {
     ok: true,
     solution: {
-      title: "Interpenetration of two cylinders",
+      title: r === R ? "Two cylinders of equal diameter" : "Interpenetration of two cylinders",
       problem: `A vertical cylinder of diameter ${i.mainDiameter} mm and height ${H} mm is pierced by a horizontal cylinder of diameter ${i.branchDiameter} mm. Their axes intersect at right angles, and the axis of the horizontal cylinder is ${round(zc)} mm above the base and parallel to the VP. Draw the curves of intersection.`,
       givens: [
         { name: "Vertical cylinder", value: `Ø${i.mainDiameter} × ${H} mm` },

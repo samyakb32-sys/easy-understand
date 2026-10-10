@@ -104,9 +104,9 @@ describe("sections of solids", () => {
     expect(Math.abs(+m[1] - exact) / exact).toBeLessThan(0.005);
   });
 
-  it("refuses a plane that cuts the solid into pieces", () => {
-    const r = solveSectionRound({ solid: "cylinder", diameter: 40, height: 30, angle: 60, axisHeight: 15 });
-    expect(r.ok).toBe(false);
+  it("refuses a plane that misses the solid", () => {
+    expect(solveSectionRound({ solid: "cylinder", diameter: 40, height: 30, angle: 10, axisHeight: 200 }).ok).toBe(false);
+    expect(solveSectionRound({ solid: "cylinder", diameter: 40, height: 30, angle: 60, axisHeight: 15, axisOffset: 25 }).ok).toBe(false);
   });
 
   it("handles a cone cut by a plane that stays inside it", () => {

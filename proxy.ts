@@ -5,19 +5,25 @@ import { supabaseAnonKey, supabaseConfigured, supabaseUrl } from "./lib/env";
 /** Keeps the student's login fresh: refreshes the session cookie before pages and API routes read it. */
 export async function proxy(request: NextRequest) {
   if (!supabaseConfigured()) return NextResponse.next();
-  let response = NextResponse.next({ request });
-  const supabase = createServerClient(supabaseUrl(), supabaseAnonKey(), {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll: (list) => {
-        list.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        list.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+  try {
+    let response = NextResponse.next({ request });
+    const supabase = createServerClient(supabaseUrl(), supabaseAnonKey(), {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (list) => {
+          list.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          list.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        },
       },
-    },
-  });
-  await supabase.auth.getClaims();
-  return response;
+    });
+    await supabase.auth.getClaims();
+    return response;
+  } catch (e) {
+    // a Supabase problem must not take the whole site down, including the keyless example lessons
+    console.error("proxy: could not refresh the session", e);
+    return NextResponse.next();
+  }
 }
 
 export const config = {
