@@ -27,7 +27,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function PricingCards() {
   const router = useRouter();
-  const { me, refresh } = useEntitlements();
+  const { me, failed, refresh, retry } = useEntitlements();
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const polling = useRef(false);
@@ -38,7 +38,7 @@ export function PricingCards() {
     polling.current = true;
     for (let i = 0; i < 12; i++) {
       const m = await refresh();
-      if (m?.isPro) { setMsg({ tone: "info", text: "You're Pro now. Thank you! 3D models and unlimited solves are unlocked." }); polling.current = false; return; }
+      if (m?.isPro) { setMsg({ tone: "info", text: "You're Pro now. Thank you! 3D models and more daily solves are unlocked." }); polling.current = false; return; }
       await sleep(3000);
     }
     polling.current = false;
@@ -48,7 +48,10 @@ export function PricingCards() {
   const buy = async (plan: Plan) => {
     setMsg(null);
     if (plan.id === "free") { router.push(me?.signedIn ? "/#upload" : "/login?next=" + encodeURIComponent("/#upload")); return; }
-    if (!me) return;
+    if (!me) {
+      if (failed) { setMsg({ tone: "error", text: "We couldn't check your account. Check your connection and try again." }); void retry(); }
+      return;
+    }
     if (!me.configured.auth) { setMsg({ tone: "info", text: "Sign-in isn't set up on this site yet, so plans can't be bought right now." }); return; }
     if (!me.signedIn) { router.push("/login?next=" + encodeURIComponent("/#pricing")); return; }
     if (!me.configured.payments) { setMsg({ tone: "info", text: "Payments aren't switched on yet. Please check back soon." }); return; }
@@ -73,7 +76,7 @@ export function PricingCards() {
             const v = await fetch("/api/checkout/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(r) });
             const out = await v.json();
             if (!out.ok) throw new Error(out.reason);
-            if (out.pro) { await refresh(); setMsg({ tone: "info", text: "You're Pro now. Thank you! 3D models and unlimited solves are unlocked." }); }
+            if (out.pro) { await refresh(); setMsg({ tone: "info", text: "You're Pro now. Thank you! 3D models and more daily solves are unlocked." }); }
             else await waitForPro();
           } catch (e) {
             setMsg({ tone: "error", text: (e instanceof Error ? e.message : "We couldn't confirm the payment.") + " If money was deducted, access is added automatically within a few minutes." });
@@ -102,7 +105,7 @@ export function PricingCards() {
               <div className="price">{p.price}</div>
               <div className="muted -mt-1 text-sm">{p.note}</div>
               <ul>{p.features.map((f) => <li key={f}>{f}</li>)}</ul>
-              <button className={`btn ${p.highlight ? "btn-primary" : ""}`} disabled={busy !== null || isCurrent || !me} onClick={() => buy(p)}>
+              <button className={`btn ${p.highlight ? "btn-primary" : ""}`} disabled={busy !== null || isCurrent || (!me && !failed)} onClick={() => buy(p)}>
                 {busy === p.id ? "Opening payment…" : isCurrent ? "Your current plan" : p.id === "free" ? "Start free" : `Get ${p.name}`}
               </button>
             </div>

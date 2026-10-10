@@ -3,7 +3,7 @@ import { LoginForm } from "@/components/LoginForm";
 import { supabaseConfigured } from "@/lib/env";
 import { safeNext } from "@/lib/http";
 
-export const metadata = { title: "Sign in · EasyUnderstand 製図" };
+export const metadata = { title: "Sign in · EasyUnderstand 製図", robots: { index: false } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const sp = await searchParams;

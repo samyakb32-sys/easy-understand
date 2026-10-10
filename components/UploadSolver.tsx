@@ -1,18 +1,31 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Solution } from "@/lib/schema";
 
+/** The server rejects longer text (app/api/solve/route.ts), so the box stops at the same length. */
+const MAX_TEXT = 4000;
+
 /** Shrinks a photo so a phone picture doesn't become a 10 MB upload. Returns base64 JPEG without the prefix. */
 async function toJpegBase64(file: File, max = 1600): Promise<string> {
-  const bmp = await createImageBitmap(file);
+  let bmp: ImageBitmap;
+  try {
+    bmp = await createImageBitmap(file);
+  } catch {
+    throw new Error("This browser can't read that image. Please use a JPG, PNG or WEBP photo.");
+  }
   const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement("canvas");
   c.width = Math.round(bmp.width * k);
   c.height = Math.round(bmp.height * k);
-  c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+  const ctx = c.getContext("2d")!;
+  // JPEG has no alpha: without a white ground, transparent PNG/WEBP pixels turn black and dark linework vanishes
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close();
   return c.toDataURL("image/jpeg", 0.85).split(",")[1];
 }
 
@@ -25,6 +38,12 @@ export function UploadSolver() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
+  const inflight = useRef<AbortController | null>(null);
+
+  // leaving the page cancels a solve in flight, so it cannot redirect the student later
+  useEffect(() => () => inflight.current?.abort(), []);
+  // free the preview's object URL when it is replaced or the page closes
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
   const pick = (f: File | undefined | null) => {
     if (!f) return;
@@ -34,14 +53,25 @@ export function UploadSolver() {
     setPreview(URL.createObjectURL(f));
   };
 
+  const clear = () => {
+    setFile(null);
+    setPreview(null);
+    setError(null);
+    if (input.current) input.current.value = ""; // so choosing the same file again fires onChange
+  };
+
   const solve = async () => {
     setError(null);
     setCode(null);
+    const ctrl = new AbortController();
+    inflight.current = ctrl;
     try {
       setBusy("Reading your drawing…");
       const image = file ? await toJpegBase64(file) : undefined;
+      if (ctrl.signal.aborted) return;
       setBusy("Planning the steps…");
       const res = await fetch("/api/solve", {
+        signal: ctrl.signal,
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ image, mediaType: image ? "image/jpeg" : undefined, text: text || undefined }),
@@ -54,8 +84,10 @@ export function UploadSolver() {
       sessionStorage.setItem("eu:custom", JSON.stringify(sol));
       // Pro lessons are saved to history; if that failed the lesson page says so
       if (data.saved === false) sessionStorage.setItem("eu:custom-unsaved", "1"); else sessionStorage.removeItem("eu:custom-unsaved");
+      if (ctrl.signal.aborted) return;
       router.push("/solve/custom");
     } catch (e) {
+      if (ctrl.signal.aborted) return; // the student left the page
       setError(e instanceof Error ? e.message : "Something went wrong.");
       setBusy(null);
     }
@@ -79,11 +111,12 @@ export function UploadSolver() {
             <span className="muted">or tap to choose · camera works on phones</span>
           </>
         )}
-        <input ref={input} type="file" accept="image/*" capture="environment" hidden onChange={(e) => pick(e.target.files?.[0])} />
+        <input ref={input} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
       </div>
+      {file && !busy && <button type="button" className="btn w-full" onClick={clear}>Remove photo</button>}
       <label className="field">
         <span>…or type it</span>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3}
+        <textarea value={text} maxLength={MAX_TEXT} onChange={(e) => setText(e.target.value)} rows={3}
           placeholder="A line AB, 60 mm long, is inclined at 30° to the HP and 45° to the VP. Draw its projections." />
       </label>
       <button className="btn btn-primary w-full" disabled={!!busy || (!file && !text.trim())} onClick={solve}>

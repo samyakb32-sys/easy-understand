@@ -38,12 +38,13 @@ a { color: inherit; }
 /* ---------- nav ---------- */
 .nav { position: fixed; inset: 0 0 auto 0; z-index: 30; backdrop-filter: blur(10px); background: linear-gradient(#05080fcc, #05080f00); }
 .nav-in { display: flex; align-items: center; justify-content: space-between; height: 64px; }
-.brand { font-family: var(--font-display); font-size: 1.15rem; letter-spacing: 0.02em; text-decoration: none; }
+.brand { white-space: nowrap; font-family: var(--font-display); font-size: 1.15rem; letter-spacing: 0.02em; text-decoration: none; }
 .brand i { font-family: var(--font-jp); font-style: normal; color: var(--amber); margin-left: 0.5em; font-size: 0.95em; }
 .nav-links { display: flex; gap: 22px; font-size: 0.9rem; color: var(--muted); }
-.nav-links a { text-decoration: none; }
+.nav-links a { text-decoration: none; white-space: nowrap; }
 .nav-links a:hover { color: var(--text); }
-@media (max-width: 640px) { .nav-links .hide-sm { display: none; } }
+@media (max-width: 640px) { .nav-links .hide-sm { display: none; } .nav-links { gap: 14px; } }
+.nav-auth-slot { display: inline-block; min-width: 80px; }
 
 /* ---------- buttons ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border-radius: 999px; font-weight: 600; font-size: 0.95rem; border: 1px solid var(--line); background: transparent; color: var(--text); cursor: pointer; text-decoration: none; transition: transform .15s, box-shadow .2s, background .2s; }
@@ -88,7 +89,7 @@ section.block h2 { font-family: var(--font-display); font-weight: 400; font-size
 .card h3 { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; margin: 10px 0 6px; }
 .card p { color: var(--muted); margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 18px; }
-.chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: .88rem; }
+.chip { position: relative; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: .88rem; }
 @media (max-width: 640px) {
   /* 45 example lessons: one scrolling row, so the player is not pushed three screens down */
   .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }

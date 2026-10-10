@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import type { LineStyle, Point, Primitive, Solution } from "@/lib/schema";
 import { ellipsePoint } from "@/lib/geometry/basic";
 import { primitiveLength, type Timeline } from "@/lib/timeline";
@@ -57,9 +57,10 @@ function polyPoints(p: Extract<Primitive, { t: "poly" }>): Point[] {
 }
 
 /** Point at fraction p along a primitive, in screen space. Null for text. */
-function tip(prim: Primitive, p: number): Point | null {
+export function tip(prim: Primitive, p: number): Point | null {
   if (prim.t === "line") return flip([prim.a[0] + (prim.b[0] - prim.a[0]) * p, prim.a[1] + (prim.b[1] - prim.a[1]) * p]);
-  if (prim.t === "circle") return flip([prim.c[0] + prim.r * Math.cos(2 * Math.PI * p), prim.c[1] + prim.r * Math.sin(2 * Math.PI * p)]);
+  // an SVG <circle> is stroked clockwise on screen from 3 o'clock, which is the negative-angle direction in y-up maths
+  if (prim.t === "circle") return flip([prim.c[0] + prim.r * Math.cos(2 * Math.PI * p), prim.c[1] - prim.r * Math.sin(2 * Math.PI * p)]);
   if (prim.t === "arc") {
     const a = prim.from + (prim.to - prim.from) * p;
     return flip([prim.c[0] + prim.r * Math.cos(rad(a)), prim.c[1] + prim.r * Math.sin(rad(a))]);
@@ -85,6 +86,8 @@ function tip(prim: Primitive, p: number): Point | null {
 
 export function DrawingCanvas({ solution, timeline, t, activeStep }: { solution: Solution; timeline: Timeline; t: number; activeStep: number }) {
   const vb = useMemo(() => bounds(solution), [solution]);
+  // unique per canvas: the filter region below depends on this canvas's viewBox
+  const glow = `glow-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   let tipPoint: Point | null = null;
 
   const items = timeline.segments.map((seg) => {
@@ -146,14 +149,15 @@ export function DrawingCanvas({ solution, timeline, t, activeStep }: { solution:
         <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
           <path d="M 10 0 L 0 0 0 10" fill="none" stroke="var(--c-grid)" strokeWidth="0.15" />
         </pattern>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        {/* user-space region: with the default objectBoundingBox units Chrome draws nothing while the group is only a horizontal or vertical line (zero-height box) */}
+        <filter id={glow} filterUnits="userSpaceOnUse" x={vb.x} y={vb.y} width={vb.w} height={vb.h}>
           <feGaussianBlur stdDeviation="1.2" result="b" />
           <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
       <rect x={vb.x} y={vb.y} width={vb.w} height={vb.h} fill="url(#grid)" />
-      <g filter="url(#glow)">{items}</g>
-      {tipPoint && <circle cx={(tipPoint as Point)[0]} cy={(tipPoint as Point)[1]} r={1.3} fill="var(--c-accent)" filter="url(#glow)" />}
+      <g filter={`url(#${glow})`}>{items}</g>
+      {tipPoint && <circle cx={(tipPoint as Point)[0]} cy={(tipPoint as Point)[1]} r={1.3} fill="var(--c-accent)" filter={`url(#${glow})`} />}
     </svg>
   );
 }

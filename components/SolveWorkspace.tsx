@@ -17,7 +17,7 @@ export function SolveWorkspace({ initial, slug }: { initial: Solution | null; sl
   const [tab, setTab] = useState<"2d" | "3d">("2d");
   const [unsaved, setUnsaved] = useState(false);
   const pathname = usePathname();
-  const { me, loading } = useEntitlements();
+  const { me, loading, failed, retry } = useEntitlements();
   const unlocked = !loading && !!me?.canUse3D;
 
   // a lesson made from an upload is passed through sessionStorage
@@ -68,8 +68,11 @@ export function SolveWorkspace({ initial, slug }: { initial: Solution | null; sl
           <div className="lock-overlay" role="region" aria-label="3D is a Pro feature">
             <div className="lock-card">
               <div className="eyebrow">Pro feature</div>
-              <h3 className="prof-title">{loading ? "Checking your plan…" : "Unlock the 3D model"}</h3>
-              {!loading && (
+              <h3 className="prof-title">{loading ? "Checking your plan…" : failed ? "Couldn't check your plan" : "Unlock the 3D model"}</h3>
+              {failed && (
+                <div className="mt-3 flex justify-center"><button type="button" className="btn btn-primary" onClick={() => void retry()}>Try again</button></div>
+              )}
+              {!loading && !failed && (
                 <>
                   <p className="muted">Rotate the solid and snap to its front, top and side views to see how the drawing connects to the real object.</p>
                   <div className="mt-3 flex flex-wrap justify-center gap-2">

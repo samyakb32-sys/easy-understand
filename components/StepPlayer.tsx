@@ -8,6 +8,12 @@ import { DrawingCanvas } from "./DrawingCanvas";
 const SPEEDS = [0.5, 1, 2];
 const ZOOMS = [1, 2, 3];
 
+/** Longest animation step per frame: after a hidden tab or a stalled frame the first tick must not jump the lesson ahead. */
+export const MAX_FRAME_DT = 0.1;
+export function frameDt(last: number | null, now: number): number {
+  return last == null ? 0 : Math.min(MAX_FRAME_DT, Math.max(0, (now - last) / 1000));
+}
+
 /** Whether the player should take a key press for itself, or leave it to the control/browser that has it. */
 export function playerKeyAction(e: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">, el: Element | null, zoomed = false): "prev" | "next" | "toggle" | null {
   if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null; // browser shortcuts such as Alt+Left (Back)
@@ -22,7 +28,8 @@ export function playerKeyAction(e: Pick<KeyboardEvent, "key" | "altKey" | "ctrlK
   return null;
 }
 
-export function StepPlayer({ solution, compact = false }: { solution: Solution; compact?: boolean }) {
+/** `active` false holds the clock (for example while the player is scrolled out of view) without losing the position. */
+export function StepPlayer({ solution, compact = false, active = true }: { solution: Solution; compact?: boolean; active?: boolean }) {
   const timeline = useMemo(() => buildTimeline(solution), [solution]);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -39,10 +46,10 @@ export function StepPlayer({ solution, compact = false }: { solution: Solution; 
   }, [solution, end]);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || !active) return;
     let raf = 0;
     const tick = (now: number) => {
-      const dt = last.current == null ? 0 : (now - last.current) / 1000;
+      const dt = frameDt(last.current, now);
       last.current = now;
       setT((prev) => {
         const next = prev + dt * speed;
@@ -53,7 +60,7 @@ export function StepPlayer({ solution, compact = false }: { solution: Solution; 
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); last.current = null; };
-  }, [playing, speed, end]);
+  }, [playing, active, speed, end]);
 
   const step = stepAt(timeline, t);
   const goStep = useCallback((i: number) => {

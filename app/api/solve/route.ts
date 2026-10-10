@@ -96,7 +96,7 @@ export async function POST(req: Request) {
         return fail({ ok: false, reason: "Something went wrong. Please try again." }, 500);
       }
       if (!data) {
-        return fail({ ok: false, code: "limit_reached", reason: ent.isPro ? "You've reached today's fair-use limit. It resets at midnight India time." : `You've used your ${ent.dailyLimit} free solves for today. Upgrade to Pro for unlimited solves, or come back tomorrow.` }, 429);
+        return fail({ ok: false, code: "limit_reached", reason: ent.isPro ? "You've reached today's fair-use limit. It resets at midnight India time." : `You've used your ${ent.dailyLimit} free solves for today. Upgrade to Pro for more solves, or come back tomorrow.` }, 429);
       }
     } catch (e) {
       // always answer in JSON: the browser parses the reply, and a bare 500 page would show the student a parse error

@@ -4,6 +4,7 @@ import { DemoPlayer } from "@/components/DemoPlayer";
 import { NavAuth } from "@/components/NavAuth";
 import { PricingCards } from "@/components/PricingCards";
 import { UploadSolver } from "@/components/UploadSolver";
+import { FREE_DAILY_SOLVES, PRO_DAILY_SOLVES } from "@/lib/pricing";
 
 export default function Home() {
   return (
@@ -14,8 +15,8 @@ export default function Home() {
           <Link href="/" className="brand">EasyUnderstand<i lang="ja">製図</i></Link>
           <nav className="nav-links" aria-label="Sections">
             <a href="#how" className="hide-sm">How it works</a>
-            <a href="#demo">Live lesson</a>
-            <a href="#upload">Upload</a>
+            <a href="#demo" className="hide-sm">Live lesson</a>
+            <a href="#upload" className="hide-sm">Upload</a>
             <a href="#pricing" className="hide-sm">Pricing</a>
             <NavAuth />
           </nav>
@@ -75,7 +76,7 @@ export default function Home() {
         <div className="wrap">
           <div className="eyebrow">Pricing</div>
           <h2>Start free</h2>
-          <p className="sec-lede">Try everything on the examples for free. Pro unlocks unlimited AI solves, 3D models and saved lessons.</p>
+          <p className="sec-lede">Free: every example lesson in 2D and {FREE_DAILY_SOLVES} AI solves a day. Pro adds the 3D model, saved lessons and up to {PRO_DAILY_SOLVES} AI solves a day.</p>
           <PricingCards />
         </div>
       </section>

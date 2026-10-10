@@ -11,7 +11,7 @@ npm run dev                  # http://localhost:3000
 npm test                     # geometry + schema tests
 ```
 
-The example lessons (`/solve/line-projection`, `pentagon`, `cylinder-development`, `prism-views`, `isometric-prism`, `isometric-cylinder`, `section-pyramid`, `section-prism`, `section-cylinder`) work without any API key.
+The example lessons (over 40, listed in `lib/samples/index.ts`, e.g. `/solve/line-projection`, `pentagon`, `isometric-prism`, `section-pyramid`) work without any API key.
 
 ## How it works
 
@@ -52,4 +52,10 @@ Sign-in and the database use **Supabase**; payments use **Razorpay**. Nothing he
 
 ## Not done yet
 
-Refund/invoice tooling (refunds are done from the Razorpay dashboard), an admin view, GST invoices, the OpenCV/OCR pre-processing step, and some problem types (solids tilted to the VP first). Isometric rows, holed and notched solids, and interpenetration of offset cylinders, cone and cylinder, and prism and cylinder are done: see `lib/samples/index.ts` for the full list of example lessons.
+Refund/invoice tooling (refunds are done from the Razorpay dashboard), an admin view, GST invoices, and the OpenCV/OCR pre-processing step. Still unsupported problem types: a hole in a side face, off-centre or multiple holes, notches not on a top corner, penetrations of other solids, and an edge or generator tilted first. See `lib/samples/index.ts` for everything that is done.
+
+## Deploy to Vercel
+
+1. Import the repo (Node runtime). Set every variable from `.env.example` for **Production and Preview**. The `NEXT_PUBLIC_*` ones (including `NEXT_PUBLIC_SITE_URL`, your public https origin) are inlined at build time, so redeploy after changing them.
+2. Use the **production domain** (not a preview URL) in the Razorpay webhook (`/api/razorpay/webhook`) and in Supabase Auth redirect URLs (`https://<domain>/auth/callback`). Vercel Deployment Protection blocks webhook calls to protected previews.
+3. Security headers are set in `lib/security-headers.ts`. The full Content-Security-Policy is sent as `Content-Security-Policy-Report-Only`: test checkout once with Razorpay test keys, check the browser console for violations, then rename it to `Content-Security-Policy`.

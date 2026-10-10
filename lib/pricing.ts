@@ -40,18 +40,18 @@ export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && Ob
 
 export const rupees = (paise: number) => "₹" + (paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
-/** AI solves per India-time day. Pro is "unlimited" with a fair-use ceiling so one account cannot run up the bill. */
+/** AI solves per India-time day. Pro has a high fair-use ceiling so one account cannot run up the bill. */
 export const FREE_DAILY_SOLVES = 3;
 export const PRO_DAILY_SOLVES = 100;
 
 export const PLANS: Plan[] = [
-  { id: "free", name: "Free", price: "₹0", note: "to get started", features: [`${FREE_DAILY_SOLVES} AI solves a day`, "All example lessons", "Step-by-step 2D drawing"] },
+  { id: "free", name: "Free", price: "₹0", note: "to get started", features: [`${FREE_DAILY_SOLVES} AI solves a day`, "All example lessons", "Step-by-step 2D drawing (3D is Pro)"] },
   {
     id: "pro_monthly",
     name: "Pro monthly",
     price: rupees(PAID_PLANS.pro_monthly.amountPaise),
     note: "per month, cancel any time",
-    features: ["Unlimited AI solves (fair use)", "3D model with front / top / side views", "Saved history of your lessons"],
+    features: [`Up to ${PRO_DAILY_SOLVES} AI solves a day`, "3D model with front / top / side views", "Saved history of your lessons"],
   },
   {
     id: "pro_yearly",

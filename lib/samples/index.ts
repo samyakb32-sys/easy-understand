@@ -110,3 +110,8 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "plane-corner-hp-vp": "Projection of planes",
   "plane-inclined": "Projection of planes",
 };
+
+/** The sample for a URL slug, or null. Own keys only: "constructor" or "__proto__" must not resolve to Object.prototype members. */
+export function getSample(slug: string): Solution | null {
+  return Object.prototype.hasOwnProperty.call(SAMPLES, slug) ? SAMPLES[slug] : null;
+}

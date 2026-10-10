@@ -6,7 +6,7 @@ import { loadEntitlements } from "@/lib/me";
 import { PAID_PLANS, rupees } from "@/lib/pricing";
 import { currentUser, supabaseServer } from "@/lib/supabase/server";
 
-export const metadata = { title: "Your account · EasyUnderstand 製図" };
+export const metadata = { title: "Your account · EasyUnderstand 製図", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 const fmt = (d: string) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });

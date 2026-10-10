@@ -15,12 +15,13 @@ const CAM: Record<View, [number, number, number]> = {
   side: [5, 0, 0],
 };
 
-function CameraRig({ view }: { view: View }) {
+/** `snap` changes on every view-button click, so choosing the active view again re-centres a camera the student has dragged. */
+function CameraRig({ view, snap }: { view: View; snap: number }) {
   const { camera } = useThree();
   useEffect(() => {
     camera.position.set(...CAM[view]);
     camera.lookAt(0, 0, 0);
-  }, [view, camera]);
+  }, [view, snap, camera]);
   return null;
 }
 
@@ -50,6 +51,7 @@ function hasWebGL() {
 
 export function Solid3DViewer({ spec }: { spec: SolidSpec }) {
   const [view, setView] = useState<View>("iso");
+  const [snap, setSnap] = useState(0);
   const [wire, setWire] = useState(false);
   const [gl, setGl] = useState<boolean | null>(null);
   useEffect(() => setGl(hasWebGL()), []);
@@ -65,14 +67,14 @@ export function Solid3DViewer({ spec }: { spec: SolidSpec }) {
             <directionalLight position={[3, 5, 4]} intensity={1.6} />
             <Solid spec={spec} wire={wire} />
             <Grid position={[0, -1.05, 0]} args={[10, 10]} cellColor="#13324f" sectionColor="#1f5f8f" fadeDistance={9} infiniteGrid />
-            <CameraRig view={view} />
+            <CameraRig view={view} snap={snap} />
             <OrbitControls enablePan={false} minDistance={2.5} maxDistance={9} autoRotate={view === "iso"} autoRotateSpeed={1.2} makeDefault />
           </Canvas>
         )}
       </div>
       <div className="controls">
         {(["iso", "front", "top", "side"] as View[]).map((v) => (
-          <button key={v} className={`ctl ${view === v ? "ctl-main" : ""}`} onClick={() => setView(v)}>
+          <button key={v} className={`ctl ${view === v ? "ctl-main" : ""}`} onClick={() => { setView(v); setSnap((n) => n + 1); }}>
             {v === "iso" ? "3D" : v[0].toUpperCase() + v.slice(1)}
           </button>
         ))}

@@ -4,7 +4,7 @@ import { serviceRoleConfigured, supabaseConfigured } from "@/lib/env";
 import { loadEntitlements } from "@/lib/me";
 import { currentUser, supabaseServer } from "@/lib/supabase/server";
 
-export const metadata = { title: "My lessons · EasyUnderstand 製図" };
+export const metadata = { title: "My lessons · EasyUnderstand 製図", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 export default async function HistoryPage() {
