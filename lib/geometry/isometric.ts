@@ -75,7 +75,7 @@ export function solveIsometricPrism(i: IsoPrismInput): { ok: true; solution: Sol
   });
   steps.push({
     title: "Raise the edges",
-    explanation: `From every corner draw a vertical line ${h} mm high (${round(h * k)} mm on the paper). The edges you can see are drawn firm; the ones hidden behind the solid stay as thin lines, because an isometric view does not show hidden edges.`,
+    explanation: `From every corner draw a vertical line ${h} mm high (${round(h * k)} mm on the paper). The edges you can see are drawn firm; the ones behind the solid are drawn thin, only as guides: an isometric view does not show hidden edges, so they are rubbed out at the end.`,
     style: "outline",
     primitives: verticals(),
   });

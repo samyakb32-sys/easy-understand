@@ -54,6 +54,7 @@ export function solveCylinderPenetration(i: CylinderPenetration): Result {
   const R = i.mainDiameter / 2, r = i.branchDiameter / 2, H = i.mainHeight;
   const zc = i.axisHeight ?? H / 2;
   if (r > R + 1e-9) return { ok: false, reason: "The cylinder that passes through must not be larger than the vertical cylinder. Swap them, or reduce its diameter." };
+  if (2 * r > H + 1e-9) return { ok: false, reason: `The branch cylinder is wider than the main one is tall: its diameter (${round(2 * r)} mm) is more than the height (${round(H)} mm). Reduce the diameter to at most ${round(H)} mm.` };
   if (zc - r < -1e-9 || zc + r > H + 1e-9) return { ok: false, reason: `The branch cylinder does not fit inside the height of the main one. Its axis must be between ${round(r)} mm and ${round(H - r)} mm above the base.` };
 
   const L = R + 15; // half-length of the branch

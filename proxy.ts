@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAnonKey, supabaseConfigured, supabaseUrl } from "./lib/env";
+import { AUTH_TIMEOUT_MS, withTimeout } from "./lib/supabase/timeout";
 
 /** Keeps the student's login fresh: refreshes the session cookie before pages and API routes read it. */
 export async function proxy(request: NextRequest) {
@@ -17,7 +18,8 @@ export async function proxy(request: NextRequest) {
         },
       },
     });
-    await supabase.auth.getClaims();
+    // an expired cookie makes the SDK retry a slow or unreachable Supabase for ~25 s: give up quickly and let the page load
+    await withTimeout(supabase.auth.getClaims(), AUTH_TIMEOUT_MS, null);
     return response;
   } catch (e) {
     // a Supabase problem must not take the whole site down, including the keyless example lessons

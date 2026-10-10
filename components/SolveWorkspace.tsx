@@ -1,12 +1,15 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Solution } from "@/lib/schema";
-import { Solid3DViewer } from "./Solid3DViewer";
 import { StepPlayer } from "./StepPlayer";
 import { useEntitlements } from "./useEntitlements";
+
+// three.js is a large download: fetch it only when the 3D tab is opened
+const Solid3DViewer = dynamic(() => import("./Solid3DViewer").then((m) => m.Solid3DViewer), { ssr: false, loading: () => <div className="muted p-6">Loading the 3D model…</div> });
 
 export function SolveWorkspace({ initial, slug }: { initial: Solution | null; slug: string }) {
   const [sol, setSol] = useState<Solution | null>(initial);
@@ -61,7 +64,7 @@ export function SolveWorkspace({ initial, slug }: { initial: Solution | null; sl
       ) : (
         // a blurred, still-turning preview: they can see what Pro gives them, but cannot use it
         <div className="relative">
-          <div aria-hidden="true" style={{ filter: "blur(7px)", pointerEvents: "none" }}><Solid3DViewer spec={sol.solid} /></div>
+          <div inert aria-hidden="true" style={{ filter: "blur(7px)", pointerEvents: "none" }}><Solid3DViewer spec={sol.solid} /></div>
           <div className="lock-overlay" role="region" aria-label="3D is a Pro feature">
             <div className="lock-card">
               <div className="eyebrow">Pro feature</div>

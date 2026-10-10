@@ -256,6 +256,7 @@ export function solveOffsetCylinders(i: OffsetCylinders): Result {
   if (e === 0) return solveCylinderPenetration({ mainDiameter: i.mainDiameter, mainHeight: H, branchDiameter: i.branchDiameter, axisHeight: i.axisHeight });
   if (r > R + 1e-9) return { ok: false, reason: "The cylinder that passes through must not be larger than the vertical cylinder. Swap them, or reduce its diameter." };
   if (e + r > R + 1e-9) return { ok: false, reason: `With its axis ${mm(e)} off-centre the horizontal cylinder sticks out beyond the sides of the vertical one. The offset plus the branch radius (${mm(e + r)}) must not be more than the main radius (${mm(R)}); the offset can be at most ${mm(R - r)}.` };
+  if (2 * r > H + 1e-9) return { ok: false, reason: `The branch cylinder is wider than the main one is tall: its diameter (${mm(2 * r)}) is more than the height (${mm(H)}). Reduce the diameter to at most ${mm(H)}.` };
   if (zc - r < -1e-9 || zc + r > H + 1e-9) return { ok: false, reason: `The branch cylinder does not fit inside the height of the main one. Its axis must be between ${mm(r)} and ${mm(H - r)} above the base.` };
   const L = R + 15, xe = Math.sqrt(R * R - e * e);
   return assemble({
@@ -346,6 +347,7 @@ export function solvePrismCylinder(i: PrismCylinder): Result {
   if (!positive(s, H, r) || !Number.isFinite(zc)) return NOT_POSITIVE;
   const W = inc ? s / Math.SQRT2 : s / 2; // half the width of the prism, seen in the front and top views
   if (r > W + 1e-9) return { ok: false, reason: `The cylinder must not be wider than the prism: its diameter (${i.branchDiameter} mm) can be at most ${mm(2 * W)} here.` };
+  if (2 * r > H + 1e-9) return { ok: false, reason: `The cylinder is wider than the prism is tall: its diameter (${mm(2 * r)}) is more than the height (${mm(H)}). Reduce the diameter to at most ${mm(H)}.` };
   if (zc - r < -1e-9 || zc + r > H + 1e-9) return { ok: false, reason: `The cylinder does not fit inside the height of the prism. Its axis must be between ${mm(r)} and ${mm(H - r)} above the base.` };
   const poly: Point[] = inc ? [[W, 0], [0, W], [-W, 0], [0, -W]] : [[W, -W], [W, W], [-W, W], [-W, -W]];
   const L = W + 15;

@@ -237,7 +237,7 @@ export function solveIsometricComposite(input: CompositeInput): Result {
     });
     steps.push({
       title: `Draw the ${SHORT[b.detail as Part["kind"]]}`,
-      explanation:
+      explanation: pieces.length === 0 ? `This ${SHORT[b.detail as Part["kind"]]} is completely hidden behind the solid above it, so nothing of it is drawn.${i < built.length - 1 ? "" : " This completes the composite solid."}` :
         (b.detail === "prism" ? "Raise the vertical edges you can see and draw the top face. " : b.detail === "cylinder" ? "Draw the front half of the base ellipse, the whole top ellipse and the two vertical tangents. " : b.detail === "cone" ? "Draw the base ellipse and two tangents from the apex. " : b.detail === "sphere" ? "Draw a circle whose radius is half the major axis of the equator ellipse. " : "Draw the front half of the flat-face ellipse and the dome as half a circle. ") +
         (i < built.length - 1 ? "Leave out any line that will be hidden behind the solid placed on top of it." : "This completes the composite solid."),
       style: "outline",

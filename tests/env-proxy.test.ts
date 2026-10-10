@@ -37,3 +37,31 @@ describe("proxy", () => {
     expect(res.headers.get("x-middleware-next")).toBe("1");
   });
 });
+
+describe("proxy with a slow Supabase", () => {
+  it("lets the request through quickly instead of waiting out the SDK's retries", async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://myproj.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "k";
+    vi.doMock("@supabase/ssr", () => ({ createServerClient: () => ({ auth: { getClaims: () => new Promise(() => {}) } }) }));
+    vi.useFakeTimers();
+    try {
+      const { proxy } = await import("../proxy");
+      const { NextRequest } = await import("next/server");
+      const pending = proxy(new NextRequest("https://app.example.com/"));
+      await vi.advanceTimersByTimeAsync(3000);
+      const res = await pending;
+      expect(res.headers.get("x-middleware-next")).toBe("1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("withTimeout", () => {
+  it("returns the value, or the fallback on timeout or failure", async () => {
+    const { withTimeout } = await import("@/lib/supabase/timeout");
+    expect(await withTimeout(Promise.resolve(1), 50, 0)).toBe(1);
+    expect(await withTimeout(Promise.reject(new Error("x")), 50, 0)).toBe(0);
+    expect(await withTimeout(new Promise<number>(() => {}), 10, 0)).toBe(0);
+  });
+});

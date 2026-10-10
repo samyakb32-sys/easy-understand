@@ -89,11 +89,16 @@ section.block h2 { font-family: var(--font-display); font-weight: 400; font-size
 .card p { color: var(--muted); margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 18px; }
 .chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: .88rem; }
+@media (max-width: 640px) {
+  /* 45 example lessons: one scrolling row, so the player is not pushed three screens down */
+  .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }
+  .chip { flex: none; white-space: nowrap; }
+}
 .chip.on { color: #1a1105; background: var(--amber); border-color: var(--amber); }
 
 /* ---------- player ---------- */
 .board-frame { background: #040a14; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px -30px rgba(40, 140, 220, .35); }
-.drawing-board { display: block; background: radial-gradient(circle at 50% 40%, #0b1c30, #050c17); touch-action: pan-y; }
+.drawing-board { display: block; background: radial-gradient(circle at 50% 40%, #0b1c30, #050c17); touch-action: pan-x pan-y pinch-zoom; }
 .controls { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: #060d18; flex-wrap: wrap; }
 .ctl { min-width: 40px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: #0b1626; color: var(--text); cursor: pointer; font: inherit; font-size: .85rem; }
 .ctl:hover { border-color: var(--cyan); }

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PAID_PLANS, rupees } from "@/lib/pricing";
@@ -52,6 +53,12 @@ const DOCS: Record<string, { title: string; body: string[] }> = {
 
 export function generateStaticParams() {
   return Object.keys(DOCS).map((doc) => ({ doc }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ doc: string }> }): Promise<Metadata> {
+  const { doc } = await params;
+  const d = DOCS[doc];
+  return d ? { title: `${d.title} · EasyUnderstand 製図` } : {};
 }
 
 export default async function LegalPage({ params }: { params: Promise<{ doc: string }> }) {

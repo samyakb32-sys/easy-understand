@@ -6,12 +6,28 @@ import { buildTimeline, stepAt } from "@/lib/timeline";
 import { DrawingCanvas } from "./DrawingCanvas";
 
 const SPEEDS = [0.5, 1, 2];
+const ZOOMS = [1, 2, 3];
+
+/** Whether the player should take a key press for itself, or leave it to the control/browser that has it. */
+export function playerKeyAction(e: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">, el: Element | null, zoomed = false): "prev" | "next" | "toggle" | null {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null; // browser shortcuts such as Alt+Left (Back)
+  const tag = el?.tagName ?? "";
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return null;
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    if (zoomed && el?.closest("[data-board]")) return null; // arrows pan a zoomed drawing
+    return e.key === "ArrowRight" ? "next" : "prev";
+  }
+  // Space belongs to a focused button or link: it activates that control
+  if (e.key === " " && el?.closest("[data-player]") && !el.closest("button, a, summary")) return "toggle";
+  return null;
+}
 
 export function StepPlayer({ solution, compact = false }: { solution: Solution; compact?: boolean }) {
   const timeline = useMemo(() => buildTimeline(solution), [solution]);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
+  const [zoom, setZoom] = useState(1);
   const last = useRef<number | null>(null);
   const end = timeline.total - 0.8;
 
@@ -53,11 +69,10 @@ export function StepPlayer({ solution, compact = false }: { solution: Solution; 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return;
-      if (e.key === "ArrowRight") goStep(step + 1);
-      if (e.key === "ArrowLeft") goStep(step - 1);
-      if (e.key === " " && el.closest("[data-player]")) { e.preventDefault(); toggle(); }
+      const action = playerKeyAction(e, e.target as Element | null, zoom > 1);
+      if (action === "next") goStep(step + 1);
+      if (action === "prev") goStep(step - 1);
+      if (action === "toggle") { e.preventDefault(); toggle(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -67,8 +82,15 @@ export function StepPlayer({ solution, compact = false }: { solution: Solution; 
   return (
     <div data-player className="player grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="board-frame">
-        <div className={compact ? "aspect-[16/10]" : "aspect-[4/3] lg:aspect-[16/11]"}>
-          <DrawingCanvas solution={solution} timeline={timeline} t={t} activeStep={step} />
+        {/* zooming makes the drawing larger than the frame, which then scrolls: labels stay readable on a phone */}
+        <div
+          data-board
+          className={`${compact ? "aspect-[16/10]" : "aspect-[4/3] lg:aspect-[16/11]"} ${zoom > 1 ? "overflow-auto" : "overflow-hidden"}`}
+          {...(zoom > 1 ? { tabIndex: 0, role: "group", "aria-label": "Drawing, zoomed: scroll to pan" } : {})}
+        >
+          <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}>
+            <DrawingCanvas solution={solution} timeline={timeline} t={t} activeStep={step} />
+          </div>
         </div>
         <div className="controls">
           <button onClick={() => goStep(step - 1)} aria-label="Previous step" className="ctl">⏮</button>
@@ -79,6 +101,7 @@ export function StepPlayer({ solution, compact = false }: { solution: Solution; 
             onChange={(e) => { setPlaying(false); setT(Number(e.target.value)); }}
             aria-label="Scrub through the lesson" className="scrub"
           />
+          <button onClick={() => setZoom((z) => ZOOMS[(ZOOMS.indexOf(z) + 1) % ZOOMS.length])} aria-label={`Zoom the drawing, now ${zoom}×`} className="ctl">🔍 {zoom}×</button>
           <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Speed" className="ctl speed">
             {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
           </select>

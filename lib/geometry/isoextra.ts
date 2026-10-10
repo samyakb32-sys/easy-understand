@@ -74,13 +74,14 @@ export function solveIsometricRow(i: RowInput): Result {
   const box = feet as [number, number, number, number][];
   const [a0, c0] = along === "x" ? [0, 2] : [2, 0]; // index of the footprint's lower end along the row, and across it
   const ext = box.map((f) => f[a0 + 1] - f[a0]);
-  const wide = Math.max(...box.map((f) => f[c0 + 1] - f[c0]));
+  // the solids share one axis across the row: the width is twice the largest reach from that axis (a triangle or pentagon is not centred on its bounding box)
+  const wide = 2 * Math.max(...box.map((f) => Math.max(-f[c0], f[c0 + 1])));
   const starts = ext.map((_, j) => ext.slice(0, j).reduce((s, e) => s + e, 0) + gap * j);
   const span = starts[starts.length - 1] + ext[ext.length - 1];
 
   const built: Built[] = [];
   for (const [j, p] of parts.entries()) {
-    const a = starts[j] - box[j][a0], c = wide / 2 - (box[j][c0] + box[j][c0 + 1]) / 2;
+    const a = starts[j] - box[j][a0], c = wide / 2;
     const b = buildPartAt(p, along === "x" ? [a, c] : [c, a], 0, k);
     if (typeof b === "string") return fail(b);
     built.push(b);
@@ -109,11 +110,12 @@ export function solveIsometricRow(i: RowInput): Result {
   });
   const drawn: Seg[] = [];
   built.forEach((b, j) => {
+    const pieces = newLines(b.edges, hulls.slice(0, j), drawn).map((pts) => poly(pts));
     steps.push({
       title: `${j === 0 ? "Nearest solid" : j === 1 ? "Next solid" : "Farthest solid"}: the ${short(parts[j])}`,
-      explanation: `${HOW[parts[j].kind]} Its height is ${round(b.top)} mm (${round(b.top * k)} mm on the paper). ${j === 0 ? "Nothing is in front of it, so all its visible edges are drawn." : `Leave out every line that ${j === 1 ? "the nearer solid hides" : "the nearer solids hide"}. ${gap > 0 ? `The ${gap} mm gap lets part of it show beside the nearer solid.` : "Where the solids touch, the faces pressed together are not drawn, so no line is left between them except the edges you can see."}`}${j === parts.length - 1 ? " This completes the row." : ""}`,
+      explanation: pieces.length === 0 ? `The ${short(parts[j])} (height ${round(b.top)} mm) is completely hidden behind ${j === 1 ? "the nearer solid" : "the nearer solids"}, so nothing of it is drawn.${j === parts.length - 1 ? " This completes the row." : ""}` : `${HOW[parts[j].kind]} Its height is ${round(b.top)} mm (${round(b.top * k)} mm on the paper). ${j === 0 ? "Nothing is in front of it, so all its visible edges are drawn." : `Leave out every line that ${j === 1 ? "the nearer solid hides" : "the nearer solids hide"}. ${gap > 0 ? `The ${gap} mm gap lets part of it show beside the nearer solid.` : "Where the solids touch, the faces pressed together are not drawn, so no line is left between them except the edges you can see."}`}${j === parts.length - 1 ? " This completes the row." : ""}`,
       style: "outline",
-      primitives: newLines(b.edges, hulls.slice(0, j), drawn).map((pts) => poly(pts)),
+      primitives: pieces,
     });
   });
 
