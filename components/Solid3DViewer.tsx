@@ -25,16 +25,31 @@ function CameraRig({ view, snap }: { view: View; snap: number }) {
   return null;
 }
 
-function Solid({ spec, wire }: { spec: SolidSpec; wire: boolean }) {
+/** Reads the site's theme colours, and again whenever the light/dark toggle flips them. */
+function usePalette() {
+  const read = () => {
+    const cs = getComputedStyle(document.documentElement);
+    return { violet: cs.getPropertyValue("--violet").trim() || "#684bff", ink: cs.getPropertyValue("--ink").trim() || "#151b27", line: cs.getPropertyValue("--line").trim() || "#d9dce1" };
+  };
+  const [pal, setPal] = useState(read);
+  useEffect(() => {
+    const mo = new MutationObserver(() => setPal(read()));
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, []);
+  return pal;
+}
+
+function Solid({ spec, wire, face, edge }: { spec: SolidSpec; wire: boolean; face: string; edge: string }) {
   const geo = useMemo(() => buildGeometry(spec), [spec]);
   const edges = useMemo(() => new THREE.EdgesGeometry(geo, 25), [geo]);
   return (
     <group>
       <mesh geometry={geo}>
-        <meshStandardMaterial color="#1b6fb5" transparent opacity={wire ? 0.05 : 0.5} roughness={0.35} metalness={0.2} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={face} transparent opacity={wire ? 0.05 : 0.7} roughness={0.5} metalness={0.05} side={THREE.DoubleSide} />
       </mesh>
       <lineSegments geometry={edges}>
-        <lineBasicMaterial color="#7fe8ff" toneMapped={false} />
+        <lineBasicMaterial color={edge} toneMapped={false} />
       </lineSegments>
     </group>
   );
@@ -55,31 +70,32 @@ export function Solid3DViewer({ spec }: { spec: SolidSpec }) {
   const [wire, setWire] = useState(false);
   const [gl, setGl] = useState<boolean | null>(null);
   useEffect(() => setGl(hasWebGL()), []);
+  const pal = usePalette();
 
-  if (gl === false) return <p className="muted p-6">Your browser can't show 3D (WebGL is off). The 2D steps still work.</p>;
+  if (gl === false) return <div className="board"><p className="muted" style={{ padding: 24 }}>Your browser can't show 3D (WebGL is off). The 2D steps still work.</p></div>;
   return (
-    <div className="board-frame">
-      <div className="aspect-[4/3] lg:aspect-[16/11]">
+    <div className="board">
+      <span className="board-tag" aria-hidden="true">3D / DRAG ME</span>
+      <div className="viewer3d">
         {gl && (
           <Canvas dpr={[1, 1.5]} camera={{ position: CAM.iso, fov: 40 }} aria-label="Interactive 3D model">
-            <color attach="background" args={["#05080f"]} />
-            <ambientLight intensity={0.7} />
-            <directionalLight position={[3, 5, 4]} intensity={1.6} />
-            <Solid spec={spec} wire={wire} />
-            <Grid position={[0, -1.05, 0]} args={[10, 10]} cellColor="#13324f" sectionColor="#1f5f8f" fadeDistance={9} infiniteGrid />
+            <ambientLight intensity={0.9} />
+            <directionalLight position={[3, 5, 4]} intensity={1.4} />
+            <Solid spec={spec} wire={wire} face={pal.violet} edge={pal.ink} />
+            <Grid position={[0, -1.05, 0]} args={[10, 10]} cellColor={pal.line} sectionColor={pal.violet} fadeDistance={9} infiniteGrid />
             <CameraRig view={view} snap={snap} />
             <OrbitControls enablePan={false} minDistance={2.5} maxDistance={9} autoRotate={view === "iso"} autoRotateSpeed={1.2} makeDefault />
           </Canvas>
         )}
       </div>
-      <div className="controls">
+      <div className="viewer3d-bar">
         {(["iso", "front", "top", "side"] as View[]).map((v) => (
-          <button key={v} className={`ctl ${view === v ? "ctl-main" : ""}`} onClick={() => { setView(v); setSnap((n) => n + 1); }}>
+          <button key={v} className={`tool ${view === v ? "on" : ""}`} onClick={() => { setView(v); setSnap((n) => n + 1); }}>
             {v === "iso" ? "3D" : v[0].toUpperCase() + v.slice(1)}
           </button>
         ))}
-        <button className={`ctl ${wire ? "ctl-main" : ""}`} onClick={() => setWire((w) => !w)}>Wireframe</button>
-        <span className="muted ml-auto hidden text-xs sm:inline">Drag to rotate · scroll to zoom</span>
+        <button className={`tool ${wire ? "on" : ""}`} onClick={() => setWire((w) => !w)}>Wireframe</button>
+        <span className="muted mono" style={{ marginLeft: "auto", fontSize: 10 }}>drag to rotate · scroll to zoom</span>
       </div>
     </div>
   );

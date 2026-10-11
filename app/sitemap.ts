@@ -9,6 +9,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteUrl();
   return [
     "/",
+    "/lessons",
+    "/pricing",
     ...LEGAL.map((d) => `/legal/${d}`),
     ...Object.keys(SAMPLES).map((s) => `/solve/${s}`),
   ].map((path) => ({ url: base + path }));

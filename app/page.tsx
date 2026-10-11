@@ -1,97 +1,118 @@
 import Link from "next/link";
-import { BurnIntro, HeroScene } from "@/components/HeroScene";
-import { DemoPlayer } from "@/components/DemoPlayer";
-import { NavAuth } from "@/components/NavAuth";
-import { PricingCards } from "@/components/PricingCards";
+import { HeroLessonCard } from "@/components/HeroLessonCard";
 import { UploadSolver } from "@/components/UploadSolver";
-import { FREE_DAILY_SOLVES, PRO_DAILY_SOLVES } from "@/lib/pricing";
+import { SAMPLES } from "@/lib/samples";
+import { TOPICS, lessonCount, type TopicId } from "@/lib/topics";
+
+const HERO = "prism-hp-vp";
+const TOTAL = Object.keys(SAMPLES).length;
+const TICKER = "YOU BRING THE QUESTION ✦ WE MAKE IT MAKE SENSE ✦ LINES · PLANES · SOLIDS · ISOMETRICS · SECTIONS ✦ ";
+
+const SHAPES: Record<TopicId, { cls: string; big?: boolean; svg: React.ReactNode }> = {
+  basics: { cls: "", big: true, svg: <><path d="M13 132 110 21l63 111H13Z" /><path d="M110 21v111M13 132h160" /><path d="M44 96h97" strokeDasharray="5 5" /></> },
+  solids: { cls: "c-acid", svg: <><path d="m18 37 32-19 32 19-32 19-32-19Z" /><path d="M18 37v34l32 19 32-19V37M50 56v34" /></> },
+  isometric: { cls: "c-hot", svg: <><ellipse cx="50" cy="27" rx="29" ry="12" /><path d="M21 27v42c0 16 58 16 58 0V27" /><ellipse cx="50" cy="69" rx="29" ry="12" /></> },
+  sections: { cls: "", svg: <><path d="M22 78 48 17l29 61Z" /><path d="m27 61 55-20" stroke="var(--hot)" strokeWidth="5" /></> },
+  development: { cls: "c-acid", big: true, svg: <><path d="M21 125 85 26l82 99H21Z" /><path d="M85 26v99M21 125l64-33 82 33" /><path d="M38 99 133 99M55 73h61" strokeDasharray="5 5" /></> },
+  interpenetration: { cls: "c-hot", svg: <><ellipse cx="36" cy="50" rx="15" ry="31" /><ellipse cx="64" cy="50" rx="15" ry="31" /><path d="M36 19c15 7 14 55 28 62M36 81c15-7 14-55 28-62" stroke="var(--hot)" strokeWidth="3" /></> },
+};
+const BLURB: Record<TopicId, [string, string]> = {
+  basics: ["01 / THE BASICS", "Find true lengths, true shapes and every inclination without crossing your fingers."],
+  solids: ["02 / TURN IT", "Prisms, pyramids and tilted things."],
+  isometric: ["03 / LOOKS 3D", "Make flat paper feel like an object you can pick up."],
+  sections: ["04 / SLICE IT", "Cut through a solid and reveal the shape hiding inside."],
+  development: ["05 / UNFOLD IT", "Turn a 3D object into an exact flat pattern. Very satisfying."],
+  interpenetration: ["06 / COLLIDE", "Where two solids meet. Zero guesswork."],
+};
+
+const FLOW = [
+  ["⌁", "drop the question", "Photograph it, screenshot it, upload it. Whatever’s on your phone."],
+  ["◎", "we clock the details", "Topic, dimensions, angles. You check what we read before we draw."],
+  ["⌗", "math does its thing", "Deterministic geometry plots the answer point for point."],
+  ["✦", "you draw it with us", "One line at a time. With the why, the how and a 3D view."],
+];
 
 export default function Home() {
   return (
-    <main>
-      <BurnIntro />
-      <header className="nav">
-        <div className="wrap nav-in">
-          <Link href="/" className="brand">EasyUnderstand<i lang="ja">製図</i></Link>
-          <nav className="nav-links" aria-label="Sections">
-            <a href="#how" className="hide-sm">How it works</a>
-            <a href="#demo" className="hide-sm">Live lesson</a>
-            <a href="#upload" className="hide-sm">Upload</a>
-            <a href="#pricing" className="hide-sm">Pricing</a>
-            <NavAuth />
-          </nav>
-        </div>
-      </header>
-
-      <section className="hero" id="top">
-        <HeroScene />
-        <div className="wrap">
-          <div className="hero-copy">
-            <div className="eyebrow">Engineering Graphics &amp; Design</div>
-            <h1>Watch your EGD problem <em>draw itself.</em></h1>
-            <p className="lede">
-              Upload the problem. See it solved line by line, the way a professor draws it on the board, then turn the views into a 3D model you can rotate.
-            </p>
-            <div className="cta-row">
-              <a href="#demo" className="btn btn-primary">Watch a live lesson</a>
-              <a href="#upload" className="btn">Upload my problem</a>
+    <main className="landing">
+      <div className="shell">
+        <section className="hero">
+          <div>
+            <div className="kicker"><b />A calmer way to learn EGD</div>
+            <h1>See every line.<br /><span className="scribble">Then draw it.</span></h1>
+            <p className="intro">Upload an EGD question. Get an exact construction, a reason for every line, and a solid you can turn in 3D.</p>
+            <div className="hero-actions">
+              <Link className="button" href="#solve">solve my first problem <span>↗</span></Link>
+              <Link className="textlink" href="/lessons">peek the lessons</Link>
             </div>
+            <div className="proof">{TOTAL} guided lessons · exact geometry · made for your phone</div>
           </div>
-        </div>
-        <div className="jp-seal" lang="ja" aria-hidden="true">製図 · 投影</div>
-        <div className="scroll-cue">Scroll</div>
-      </section>
-
-      <section className="block" id="how">
-        <div className="wrap">
-          <div className="eyebrow">How it works</div>
-          <h2>From a photo to a lesson in three steps</h2>
-          <div className="cards">
-            <div className="card"><span className="n">01</span><h3>Upload</h3><p>Snap your question paper or type the problem. We read the numbers and the type of problem.</p></div>
-            <div className="card"><span className="n">02</span><h3>Learn it step by step</h3><p>Construction lines first, then the final outline, with a short explanation for every step. Pause, go back, change the speed.</p></div>
-            <div className="card"><span className="n">03</span><h3>See it in 3D</h3><p>Rotate the solid and snap to the front, top and side views to see how the 2D drawing connects to the real object.</p></div>
+          <div className="hero-visual">
+            <div className="halo" />
+            <HeroLessonCard solution={SAMPLES[HERO]} label="LESSON_04 / SOLIDS" />
+            <div className="sticker" aria-hidden="true">STEP BY STEP<br />NOT MAGIC</div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section className="block" id="demo">
-        <div className="wrap">
-          <div className="eyebrow">Live lesson</div>
-          <h2>Try it now. No sign-up.</h2>
-          <p className="sec-lede">Pick a problem type and watch the drawing build. Use the arrow keys to move between steps.</p>
-          <DemoPlayer />
-        </div>
-      </section>
+      <div className="ticker" aria-hidden="true"><div>{TICKER.repeat(4)}</div></div>
 
-      <section className="block" id="upload">
-        <div className="wrap">
-          <div className="eyebrow">Your problem</div>
-          <h2>Bring your own question</h2>
-          <p className="sec-lede">The AI reads which kind of problem it is and the given values. The drawing itself is calculated by exact geometry code, not guessed.</p>
-          <UploadSolver />
-        </div>
-      </section>
+      <div className="shell">
+        <section className="section" id="topics">
+          <div className="sectiontop">
+            <div>
+              <div className="eyebrow">Pick your boss level</div>
+              <h2>All the tricky bits.<br />Finally un-tricky.</h2>
+            </div>
+            <p>Every lesson plays out line by line, then lets you turn the solid around until your brain gets it.</p>
+          </div>
+          <div className="topics">
+            {TOPICS.map((t) => {
+              const s = SHAPES[t.id];
+              return (
+                <Link key={t.id} href={`/lessons?topic=${t.id}`} className={`topic ${s.cls}`}>
+                  <span className="count">{BLURB[t.id][0]} · {lessonCount(t.id)} lessons</span>
+                  <h3>{t.label}</h3>
+                  <p>{BLURB[t.id][1]}</p>
+                  <svg className={s.big ? "bigshape" : "tinyshape"} viewBox={s.big ? "0 0 190 160" : "0 0 100 100"} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">{s.svg}</svg>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
 
-      <section className="block" id="pricing">
-        <div className="wrap">
-          <div className="eyebrow">Pricing</div>
-          <h2>Start free</h2>
-          <p className="sec-lede">Free: every example lesson in 2D and {FREE_DAILY_SOLVES} AI solves a day. Pro adds the 3D model, saved lessons and up to {PRO_DAILY_SOLVES} AI solves a day.</p>
-          <PricingCards />
-        </div>
-      </section>
+        <section className="section route" id="how">
+          <div className="bigcopy">
+            <div className="eyebrow" style={{ color: "var(--acid)" }}>The no-panic method</div>
+            <h2>Your drawing buddy has a plan.</h2>
+            <p>We use AI to read the question, then precise geometry code to make every construction exact. So the answer is reliable, and the explanation actually lands.</p>
+          </div>
+          <div className="flow">
+            {FLOW.map(([icon, title, body], i) => (
+              <div className="flowrow" key={title}>
+                <span className="flowicon" aria-hidden="true">{icon}</span>
+                <div><h4>{title}</h4><p>{body}</p></div>
+                <b>{String(i + 1).padStart(2, "0")}</b>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <footer className="site">
-        <div className="wrap flex flex-wrap justify-between gap-3">
-          <span>EasyUnderstand 製図 · Learn engineering graphics by watching it drawn.</span>
-          <span className="flex gap-4">
-            <Link href="/legal/terms">Terms</Link>
-            <Link href="/legal/privacy">Privacy</Link>
-            <Link href="/legal/refunds">Refunds</Link>
-            <Link href="/legal/contact">Contact</Link>
-          </span>
-        </div>
-      </footer>
+        <section className="lab" id="solve">
+          <div className="solvebox">
+            <div>
+              <h2>Bring the question.<br />We’ll make it click.</h2>
+              <p className="sub">Get a free guided solve in under a minute. No credit card, no vague answers.</p>
+            </div>
+            <UploadSolver />
+          </div>
+        </section>
+      </div>
+
+      <nav className="mobilebar" aria-label="Quick actions">
+        <a className="scan" href="#solve">scan question ↗</a>
+        <Link className="samples" href="/lessons">samples</Link>
+      </nav>
     </main>
   );
 }

@@ -31,9 +31,9 @@ export type PaidPlan = {
 };
 
 export const PAID_PLANS: Record<PlanId, PaidPlan> = {
-  pro_monthly: { id: "pro_monthly", kind: "subscription", amountPaise: 19900, totalCount: 60, razorpayPlanEnv: "RAZORPAY_PLAN_MONTHLY", label: "EasyUnderstand Pro (monthly)" },
-  pro_yearly: { id: "pro_yearly", kind: "subscription", amountPaise: 149900, totalCount: 10, razorpayPlanEnv: "RAZORPAY_PLAN_YEARLY", label: "EasyUnderstand Pro (yearly)" },
-  exam: { id: "exam", kind: "order", amountPaise: 49900, accessDays: 90, label: "EasyUnderstand Exam pack (90 days)" },
+  pro_monthly: { id: "pro_monthly", kind: "subscription", amountPaise: 19900, totalCount: 60, razorpayPlanEnv: "RAZORPAY_PLAN_MONTHLY", label: "linewise. Pro (monthly)" },
+  pro_yearly: { id: "pro_yearly", kind: "subscription", amountPaise: 149900, totalCount: 10, razorpayPlanEnv: "RAZORPAY_PLAN_YEARLY", label: "linewise. Pro (yearly)" },
+  exam: { id: "exam", kind: "order", amountPaise: 49900, accessDays: 90, label: "linewise. Exam pack (90 days)" },
 };
 
 export const isPlanId = (v: unknown): v is PlanId => typeof v === "string" && Object.hasOwn(PAID_PLANS, v);

@@ -10,9 +10,10 @@ describe("robots and sitemap", () => {
     for (const p of ["/api/", "/account", "/history", "/auth/", "/login"]) expect(rule.disallow).toContain(p);
     expect(r.sitemap).toMatch(/\/sitemap\.xml$/);
   });
-  it("lists home, legal and every sample lesson", () => {
+  it("lists home, lessons, pricing, legal and every sample lesson", () => {
     const urls = sitemap().map((e) => e.url);
-    expect(urls.length).toBe(1 + 4 + Object.keys(SAMPLES).length);
+    expect(urls.length).toBe(3 + 4 + Object.keys(SAMPLES).length);
+    for (const p of ["/lessons", "/pricing"]) expect(urls.some((u) => u.endsWith(p))).toBe(true);
     expect(urls.some((u) => u.endsWith("/legal/refunds"))).toBe(true);
     expect(urls.some((u) => u.endsWith("/solve/isometric-prism"))).toBe(true);
     expect(new Set(urls).size).toBe(urls.length);

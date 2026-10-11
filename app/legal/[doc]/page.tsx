@@ -1,3 +1,4 @@
+import { pageTitle } from "@/lib/brand";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,7 +8,7 @@ import { PAID_PLANS, rupees } from "@/lib/pricing";
  * DRAFT policies, written to match how the site actually works so they can be used for the Razorpay activation
  * review. They are NOT legal advice: have them checked, and fill in the business details before going live.
  */
-const BUSINESS = "EasyUnderstand (operated by [your registered business name], [address], India)";
+const BUSINESS = "linewise. (operated by [your registered business name], [address], India)";
 const CONTACT = "[support email]";
 
 const DOCS: Record<string, { title: string; body: string[] }> = {
@@ -58,7 +59,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ doc: string }> }): Promise<Metadata> {
   const { doc } = await params;
   const d = DOCS[doc];
-  return d ? { title: `${d.title} · EasyUnderstand 製図` } : {};
+  return d ? { title: pageTitle(d.title) } : {};
 }
 
 export default async function LegalPage({ params }: { params: Promise<{ doc: string }> }) {
@@ -66,11 +67,11 @@ export default async function LegalPage({ params }: { params: Promise<{ doc: str
   const d = DOCS[doc];
   if (!d) notFound();
   return (
-    <main className="lesson wrap">
-      <Link href="/" className="muted text-sm no-underline">← Back</Link>
+    <main className="page shell">
+      <Link href="/" className="back">← back home</Link>
       <h1>{d.title}</h1>
-      <p className="callout info mt-4">Draft: this text has not been reviewed by a lawyer and still contains placeholders in [square brackets].</p>
-      <div className="mt-6 grid max-w-3xl gap-4 text-[#c3d2e0]">{d.body.map((p, i) => <p key={i}>{p}</p>)}</div>
+      <p className="callout info" style={{ maxWidth: 760, marginBottom: 22 }}>Draft: this text has not been reviewed by a lawyer and still contains placeholders in [square brackets].</p>
+      <div className="prose">{d.body.map((p, i) => <p key={i}>{p}</p>)}</div>
     </main>
   );
 }

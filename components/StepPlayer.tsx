@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Solution } from "@/lib/schema";
 import { buildTimeline, stepAt } from "@/lib/timeline";
 import { DrawingCanvas } from "./DrawingCanvas";
@@ -28,8 +28,12 @@ export function playerKeyAction(e: Pick<KeyboardEvent, "key" | "altKey" | "ctrlK
   return null;
 }
 
-/** `active` false holds the clock (for example while the player is scrolled out of view) without losing the position. */
-export function StepPlayer({ solution, compact = false, active = true }: { solution: Solution; compact?: boolean; active?: boolean }) {
+/**
+ * The lesson player: drawing sheet with the teacher's note under it, givens and a clickable step list beside it,
+ * and the control bar below. `board` replaces the drawing (the 3D view) while keeping steps and controls;
+ * `extra` adds controls to the bar. `active` false holds the clock without losing the position.
+ */
+export function StepPlayer({ solution, active = true, board, extra }: { solution: Solution; active?: boolean; board?: ReactNode; extra?: ReactNode }) {
   const timeline = useMemo(() => buildTimeline(solution), [solution]);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -63,6 +67,7 @@ export function StepPlayer({ solution, compact = false, active = true }: { solut
   }, [playing, active, speed, end]);
 
   const step = stepAt(timeline, t);
+  const finished = t >= end - 0.01;
   const goStep = useCallback((i: number) => {
     const n = Math.max(0, Math.min(solution.steps.length - 1, i));
     setT(timeline.stepStarts[n]);
@@ -70,7 +75,7 @@ export function StepPlayer({ solution, compact = false, active = true }: { solut
   }, [solution.steps.length, timeline.stepStarts]);
 
   const toggle = () => {
-    if (!playing && t >= end - 0.01) setT(0);
+    if (!playing && finished) setT(0);
     setPlaying((p) => !p);
   };
 
@@ -86,48 +91,68 @@ export function StepPlayer({ solution, compact = false, active = true }: { solut
   });
 
   const cur = solution.steps[step];
+  const n = solution.steps.length;
   return (
-    <div data-player className="player grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="board-frame">
-        {/* zooming makes the drawing larger than the frame, which then scrolls: labels stay readable on a phone */}
-        <div
-          data-board
-          className={`${compact ? "aspect-[16/10]" : "aspect-[4/3] lg:aspect-[16/11]"} ${zoom > 1 ? "overflow-auto" : "overflow-hidden"}`}
-          {...(zoom > 1 ? { tabIndex: 0, role: "group", "aria-label": "Drawing, zoomed: scroll to pan" } : {})}
-        >
-          <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}>
-            <DrawingCanvas solution={solution} timeline={timeline} t={t} activeStep={step} />
+    <div data-player className="player">
+      <div>
+        {board ?? (
+          <div className="board">
+            <span className="board-tag" aria-hidden="true">2D / PROJECT</span>
+            {/* zooming makes the drawing larger than the frame, which then scrolls: labels stay readable on a phone */}
+            <div
+              data-board
+              className={`board-inner ${zoom > 1 ? "overflow-auto" : "overflow-hidden"}`}
+              {...(zoom > 1 ? { tabIndex: 0, role: "group", "aria-label": "Drawing, zoomed: scroll to pan" } : {})}
+            >
+              <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}>
+                <DrawingCanvas solution={solution} timeline={timeline} t={t} activeStep={step} highlightStep={finished ? -1 : step} />
+              </div>
+            </div>
+            <div className="board-tools">
+              <button onClick={() => setZoom((z) => ZOOMS[(ZOOMS.indexOf(z) + 1) % ZOOMS.length])} aria-label={`Zoom the drawing, now ${zoom}×`} className={`tool ${zoom > 1 ? "on" : ""}`}>⊕ {zoom}×</button>
+            </div>
           </div>
+        )}
+        <div className="caption" aria-live="polite">
+          <div className="t"><small>STEP {String(step + 1).padStart(2, "0")} / {String(n).padStart(2, "0")}</small>{cur.title}</div>
+          <p>{cur.explanation}</p>
         </div>
         <div className="controls">
-          <button onClick={() => goStep(step - 1)} aria-label="Previous step" className="ctl">⏮</button>
-          <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="ctl ctl-main">{playing ? "❚❚" : "▶"}</button>
-          <button onClick={() => goStep(step + 1)} aria-label="Next step" className="ctl">⏭</button>
+          <button onClick={() => goStep(step - 1)} aria-label="Previous step" className="ctl">◀</button>
+          <button onClick={toggle} aria-label={playing ? "Pause" : "Play"} className="ctl ctl-main">{playing ? "❚❚ Pause" : finished ? "↺ Replay" : "▶ Play"}</button>
+          <button onClick={() => goStep(step + 1)} aria-label="Next step" className="ctl">▶</button>
           <input
             type="range" min={0} max={end} step={0.01} value={Math.min(t, end)}
             onChange={(e) => { setPlaying(false); setT(Number(e.target.value)); }}
             aria-label="Scrub through the lesson" className="scrub"
           />
-          <button onClick={() => setZoom((z) => ZOOMS[(ZOOMS.indexOf(z) + 1) % ZOOMS.length])} aria-label={`Zoom the drawing, now ${zoom}×`} className="ctl">🔍 {zoom}×</button>
-          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Speed" className="ctl speed">
+          <span className="stepcount">{step + 1} / {n}</span>
+          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Speed" className="ctl">
             {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
           </select>
+          {extra}
         </div>
       </div>
 
-      <aside className="professor" aria-live="polite">
-        <div className="eyebrow">Step {step + 1} of {solution.steps.length}</div>
-        <h3 className="prof-title">{cur.title}</h3>
-        <p className="prof-text">{cur.explanation}</p>
-        <ol className="step-list">
-          {solution.steps.map((s, i) => (
-            <li key={i}>
-              <button onClick={() => goStep(i)} className={i === step ? "on" : ""} aria-current={i === step}>
-                <span>{String(i + 1).padStart(2, "0")}</span>{s.title}
-              </button>
-            </li>
-          ))}
-        </ol>
+      <aside className="side">
+        {solution.givens.length > 0 && (
+          <div className="givens">
+            <div className="h">GIVEN</div>
+            {solution.givens.map((g) => <div key={g.name} className="row"><span>{g.name}</span><b>{g.value}</b></div>)}
+          </div>
+        )}
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>Steps</div>
+          <ol className="step-list">
+            {solution.steps.map((s, i) => (
+              <li key={i}>
+                <button onClick={() => goStep(i)} className={i === step ? "on" : i < step || finished ? "done" : ""} aria-current={i === step}>
+                  <span className="n">{i < step || (finished && i !== step) ? "✓" : i + 1}</span>{s.title}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
       </aside>
     </div>
   );

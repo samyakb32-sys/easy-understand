@@ -4,11 +4,11 @@
 export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: "#05080f", color: "#e8edf5", fontFamily: "system-ui, sans-serif" }}>
+      <body style={{ margin: 0, background: "#fbf6ee", color: "#151b27", fontFamily: "system-ui, sans-serif" }}>
         <main style={{ maxWidth: 560, margin: "0 auto", padding: "4rem 1.25rem" }}>
           <h1>Something went wrong</h1>
           <p role="alert">Please try again. If it keeps happening, come back in a few minutes.</p>
-          <button type="button" onClick={reset} style={{ padding: "0.6rem 1.1rem", borderRadius: 8, border: 0, background: "#ffb347", color: "#05080f", fontWeight: 600, cursor: "pointer" }}>
+          <button type="button" onClick={reset} style={{ padding: "0.6rem 1.1rem", borderRadius: 8, border: "2px solid #151b27", background: "#684bff", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
             Try again
           </button>
         </main>

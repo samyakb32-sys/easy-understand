@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { BRAND_FULL } from "@/lib/brand";
 import { PLANS, type Plan } from "@/lib/pricing";
 import { useEntitlements } from "./useEntitlements";
 
@@ -47,13 +48,13 @@ export function PricingCards() {
 
   const buy = async (plan: Plan) => {
     setMsg(null);
-    if (plan.id === "free") { router.push(me?.signedIn ? "/#upload" : "/login?next=" + encodeURIComponent("/#upload")); return; }
+    if (plan.id === "free") { router.push(me?.signedIn ? "/#solve" : "/login?next=" + encodeURIComponent("/#solve")); return; }
     if (!me) {
       if (failed) { setMsg({ tone: "error", text: "We couldn't check your account. Check your connection and try again." }); void retry(); }
       return;
     }
     if (!me.configured.auth) { setMsg({ tone: "info", text: "Sign-in isn't set up on this site yet, so plans can't be bought right now." }); return; }
-    if (!me.signedIn) { router.push("/login?next=" + encodeURIComponent("/#pricing")); return; }
+    if (!me.signedIn) { router.push("/login?next=" + encodeURIComponent("/pricing")); return; }
     if (!me.configured.payments) { setMsg({ tone: "info", text: "Payments aren't switched on yet. Please check back soon." }); return; }
 
     setBusy(plan.id);
@@ -65,10 +66,10 @@ export function PricingCards() {
 
       const options: RazorpayOptions = {
         key: data.keyId,
-        name: "EasyUnderstand 製図",
+        name: BRAND_FULL,
         description: data.label,
         prefill: { email: data.email },
-        theme: { color: "#ffb347" },
+        theme: { color: "#684bff" },
         ...(data.kind === "subscription" ? { subscription_id: data.id } : { order_id: data.id, amount: data.amountPaise, currency: "INR" }),
         modal: { ondismiss: () => setBusy(null) },
         handler: async (r: Record<string, string>) => {
@@ -95,15 +96,15 @@ export function PricingCards() {
   const current = me?.signedIn && me.isPro ? me.planId : null;
   return (
     <>
-      <div className="cards">
+      <div className="plans">
         {PLANS.map((p) => {
           const isCurrent = (p.id === "free" && me?.signedIn && !me.isPro) || (current !== null && p.id === current);
           return (
             <div key={p.id} className={`card plan ${p.highlight ? "hl" : ""}`}>
-              {p.highlight && <span className="badge">Best value</span>}
+              {p.highlight && <span className="badge">BEST VALUE ✦</span>}
               <h3>{p.name}</h3>
               <div className="price">{p.price}</div>
-              <div className="muted -mt-1 text-sm">{p.note}</div>
+              <div className="muted" style={{ fontSize: 12, marginTop: -4 }}>{p.note}</div>
               <ul>{p.features.map((f) => <li key={f}>{f}</li>)}</ul>
               <button className={`btn ${p.highlight ? "btn-primary" : ""}`} disabled={busy !== null || isCurrent || (!me && !failed)} onClick={() => buy(p)}>
                 {busy === p.id ? "Opening payment…" : isCurrent ? "Your current plan" : p.id === "free" ? "Start free" : `Get ${p.name}`}
@@ -112,8 +113,8 @@ export function PricingCards() {
           );
         })}
       </div>
-      {msg && <p role={msg.tone === "error" ? "alert" : "status"} className={`callout ${msg.tone === "info" ? "info" : ""} mt-4`}>{msg.text}</p>}
-      <p className="muted mt-4 text-xs">
+      {msg && <p role={msg.tone === "error" ? "alert" : "status"} className={`callout ${msg.tone === "info" ? "info" : ""}`} style={{ marginTop: 16 }}>{msg.text}</p>}
+      <p className="muted" style={{ fontSize: 11, marginTop: 18, maxWidth: 720 }}>
         Payments by Razorpay (UPI, cards, netbanking). Subscriptions renew automatically and you can cancel any time from your account; you keep Pro until the end of the period you paid for.
         See the <a href="/legal/refunds" className="underline">refund policy</a>.
       </p>

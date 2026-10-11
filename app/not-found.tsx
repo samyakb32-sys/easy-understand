@@ -1,15 +1,16 @@
+import { pageTitle } from "@/lib/brand";
 import Link from "next/link";
 
-export const metadata = { title: "Page not found · EasyUnderstand 製図" };
+export const metadata = { title: pageTitle("Page not found") };
 
 export default function NotFound() {
   return (
-    <main className="lesson wrap">
+    <main className="page shell">
       <h1>We couldn&apos;t find that page</h1>
-      <p className="muted mt-2">The link may be old or mistyped.</p>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <p className="lede">The link may be old or mistyped.</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         <Link href="/" className="btn btn-primary">Back to home</Link>
-        <Link href="/#upload" className="btn">Upload a problem</Link>
+        <Link href="/#solve" className="btn">Upload a problem</Link>
       </div>
     </main>
   );

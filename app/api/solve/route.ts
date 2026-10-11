@@ -153,7 +153,8 @@ export async function POST(req: Request) {
       savedId = data?.id ?? null;
     }
     // the student still gets the lesson; `saved: false` lets the page say it was not kept in their history
-    return NextResponse.json({ ...result, savedId, saved: userId && isPro ? savedId !== null : undefined }, { headers: { "Cache-Control": "no-store" } });
+    // `template` lets the student check the numbers that were read, and re-solve in the browser if one was misread
+    return NextResponse.json({ ...result, template: reply.data, savedId, saved: userId && isPro ? savedId !== null : undefined }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return give({ ok: false, reason: "Too many requests right now. Please try again in a minute." }, 429);
     if (e instanceof Anthropic.AuthenticationError) return give({ ok: false, reason: "The AI solver's API key is invalid." }, 503);

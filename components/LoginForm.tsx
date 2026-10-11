@@ -9,7 +9,7 @@ export function LoginForm({ next, configured, initialError }: { next: string; co
   const [error, setError] = useState<string | null>(initialError ? "That sign-in link didn't work or has expired. Please request a new one and open it in the same browser you asked for it in." : null);
 
   if (!configured) {
-    return <p className="callout info">Sign-in isn't set up on this site yet. You can still use all the example lessons.</p>;
+    return <p className="callout info" style={{ maxWidth: 560 }}>Sign-in isn't set up on this site yet. You can still use all the example lessons.</p>;
   }
   const redirectTo = () => `${location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
@@ -27,17 +27,17 @@ export function LoginForm({ next, configured, initialError }: { next: string; co
   };
 
   return (
-    <div className="upload-card" style={{ maxWidth: 420 }}>
+    <div className="panel" style={{ maxWidth: 440, display: "grid", gap: 14 }}>
       <button className="btn w-full" onClick={google}>Continue with Google</button>
-      <div className="muted text-center text-xs">or get a sign-in link by email</div>
+      <div className="muted mono" style={{ textAlign: "center", fontSize: 11 }}>or get a sign-in link by email</div>
       {state === "sent" ? (
         <p role="status" className="callout info">Check your inbox for a sign-in link. Open it in this same browser and device, or it won't work. Links expire after a while.</p>
       ) : (
-        <form onSubmit={magic} className="grid gap-3">
+        <form onSubmit={magic} style={{ display: "grid", gap: 12 }}>
           <label className="field">
             <span>Email</span>
             <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email"
-              className="rounded-xl border border-[var(--line)] bg-[#070f1b] p-3 text-[var(--text)]" />
+              className="input" />
           </label>
           <button className="btn btn-primary" disabled={state === "sending"}>{state === "sending" ? "Sending…" : "Email me a link"}</button>
         </form>
