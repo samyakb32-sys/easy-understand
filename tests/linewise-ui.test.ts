@@ -55,3 +55,15 @@ describe("lesson thumbnails", () => {
     }
   });
 });
+
+describe("Sarthak's lines", () => {
+  it("deal every line once before any repeats, never starting with the last one said", async () => {
+    const { SARTHAK_LINES, shuffledOrder } = await import("@/components/Sarthak");
+    expect(new Set(SARTHAK_LINES).size).toBe(SARTHAK_LINES.length);
+    for (let last = -1; last < SARTHAK_LINES.length; last++) {
+      const order = shuffledOrder(SARTHAK_LINES.length, last);
+      expect([...order].sort((a, b) => a - b)).toEqual(SARTHAK_LINES.map((_, i) => i));
+      expect(order[0]).not.toBe(last);
+    }
+  });
+});

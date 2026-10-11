@@ -51,6 +51,8 @@ export const SAMPLES: Record<string, Solution> = {
   "cone-inclined": mustSolve(solveTilted({ solid: "cone", diameter: 40, height: 60, angle: 40 })),
   "pyramid-inclined": mustSolve(solveTilted({ solid: "pyramid", base: "pentagon", side: 25, height: 50, angle: 45, rest: "corner" })),
   "prism-inclined": mustSolve(solveTilted({ solid: "prism", base: "hexagon", side: 25, height: 50, angle: 30, rest: "edge" })),
+  // the home page's live demo: "a square prism, 30 mm side and 50 mm axis, rests on HP on a base edge, axis 40° to HP"
+  "square-prism-inclined": mustSolve(solveTilted({ solid: "prism", base: "square", side: 30, height: 50, angle: 40, rest: "edge" })),
   "cone-hp-vp": mustSolve(solveTilted({ solid: "cone", diameter: 40, height: 60, angle: 40, phi: 30 })),
   "pyramid-hp-vp": mustSolve(solveTilted({ solid: "pyramid", base: "square", side: 30, height: 60, angle: 45, rest: "corner", phi: 35 })),
   "prism-hp-vp": mustSolve(solveTilted({ solid: "prism", base: "hexagon", side: 25, height: 50, angle: 30, rest: "edge", phi: 50 })),
@@ -99,6 +101,7 @@ export const SAMPLE_CATEGORIES: Record<string, string> = {
   "cone-inclined": "Projection of solids",
   "pyramid-inclined": "Projection of solids",
   "prism-inclined": "Projection of solids",
+  "square-prism-inclined": "Projection of solids",
   "cone-hp-vp": "Projection of solids",
   "pyramid-hp-vp": "Projection of solids",
   "prism-hp-vp": "Projection of solids",

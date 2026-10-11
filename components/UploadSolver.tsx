@@ -32,11 +32,15 @@ async function toJpegBase64(file: File, max = 1600): Promise<string> {
 
 type Read = { solution: Solution; template: Record<string, unknown> | null; saved: boolean | undefined; fields: ReadField[]; tags: string[] };
 
+const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`;
+
+/** The upload panel of /solve: photo or typed question → read → "is this right?" → the lesson. */
 export function UploadSolver() {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [drag, setDrag] = useState(false);
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -45,14 +49,12 @@ export function UploadSolver() {
   const [read, setRead] = useState<Read | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [checkError, setCheckError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const inflight = useRef<AbortController | null>(null);
 
   // leaving the page cancels a solve in flight, so it cannot redirect the student later
   useEffect(() => () => inflight.current?.abort(), []);
   // free the preview's object URL when it is replaced or the page closes
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 2500); return () => clearTimeout(id); }, [toast]);
   // Escape closes the check dialog
   useEffect(() => {
     if (!read) return;
@@ -67,7 +69,6 @@ export function UploadSolver() {
     setError(null);
     setFile(f);
     setPreview(URL.createObjectURL(f));
-    setToast("Nice. Your question is ready to solve.");
   };
 
   const clear = () => {
@@ -81,7 +82,7 @@ export function UploadSolver() {
     sessionStorage.setItem("eu:custom", JSON.stringify(sol));
     // Pro lessons are saved to history; if that failed the lesson page says so
     if (saved === false) sessionStorage.setItem("eu:custom-unsaved", "1"); else sessionStorage.removeItem("eu:custom-unsaved");
-    router.push("/solve/custom");
+    router.push("/lessons/custom");
   };
 
   const solve = async () => {
@@ -98,7 +99,7 @@ export function UploadSolver() {
         signal: ctrl.signal,
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ image, mediaType: image ? "image/jpeg" : undefined, text: text || undefined }),
+        body: JSON.stringify({ image, mediaType: image ? "image/jpeg" : undefined, text: text.trim() || undefined }),
       });
       // a platform timeout or an oversized upload answers with plain text or HTML, not our JSON
       const data = await res.json().catch(() => null);
@@ -129,7 +130,7 @@ export function UploadSolver() {
     const next: Record<string, unknown> = { ...read.template };
     for (const k of changed) {
       const v = Number(edits[k]);
-      if (!Number.isFinite(v)) return setCheckError("Please enter numbers only.");
+      if (!edits[k].trim() || !Number.isFinite(v)) return setCheckError("Please enter numbers only.");
       next[k] = v;
     }
     setCheckError(null);
@@ -138,76 +139,86 @@ export function UploadSolver() {
     if (!t.success) return setCheckError("One of those numbers is out of range for this kind of problem.");
     const r = solveTemplate(t.data);
     if (!r.ok) return setCheckError(r.reason);
-    // a corrected lesson was not the one saved to history
+    // a corrected lesson is not the one that was saved to history
     open(r.solution, read.saved === undefined ? undefined : false);
   };
 
   return (
-    <div className="uploadcard">
-      <div className="uploadtitle">SCAN A QUESTION</div>
-      <div
-        className="uploadzone"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => { e.preventDefault(); pick(e.dataTransfer.files[0]); }}
-        onClick={() => input.current?.click()}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), input.current?.click())}
-        role="button" tabIndex={0} aria-label="Choose or drop a photo of your problem"
+    <div className="panel solve-panel">
+      <div className="solver-head"><h2>Upload a question</h2><span className="micro">JPG · PNG · screenshot</span></div>
+      <label
+        className={`upload-stage ${drag ? "drag" : ""}`}
+        htmlFor="problem-file"
+        onDragEnter={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files[0]); }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {preview ? <img src={preview} alt="Your problem" /> : (<><strong>Drop a photo here</strong>or choose one from your phone</>)}
-        <input ref={input} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
-      </div>
-      {file && !busy && <button type="button" className="linkbtn" onClick={clear}>Remove photo</button>}
+        <div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {preview ? <img src={preview} alt="Your question" /> : <div className="upload-glyph" aria-hidden="true">⌁</div>}
+          <h3>{preview ? "Looks good" : "Drop a problem here"}</h3>
+          <p>{preview ? "Choose another photo to replace it." : "Or choose a photo from your phone. Clear handwritten questions work too."}</p>
+          <span className="primary">{preview ? "Choose another image" : "Choose image"}</span>
+        </div>
+        <input id="problem-file" ref={input} type="file" accept="image/*" onChange={(e) => pick(e.target.files?.[0])} />
+      </label>
+      <div className="hint-row">Tip: include the full question and its dimensions for the best result.</div>
+      {file && (
+        <div className="preview show">
+          <span className="file-icon" aria-hidden="true">▧</span>
+          <div><strong>{file.name}</strong><small>{kb(file.size)} · ready to read</small></div>
+          {!busy && <button className="remove-file" onClick={clear}>Remove</button>}
+        </div>
+      )}
       {typing ? (
-        <label className="field">
-          <span>Type the question</span>
-          <textarea value={text} maxLength={MAX_TEXT} onChange={(e) => setText(e.target.value)} rows={3} autoFocus
+        <label>
+          <span className="sr-only">Type the question</span>
+          <textarea className="field problem-text" value={text} maxLength={MAX_TEXT} onChange={(e) => setText(e.target.value)} rows={3} autoFocus
             placeholder="A line AB, 60 mm long, is inclined at 30° to the HP and 45° to the VP. Draw its projections." />
         </label>
       ) : (
-        <button type="button" className="linkbtn" onClick={() => setTyping(true)}>…or type it instead</button>
+        <button type="button" className="text-toggle" onClick={() => setTyping(true)}>…or type the question instead</button>
       )}
-      <button className="btn btn-primary" disabled={!!busy || (!file && !text.trim())} onClick={solve} aria-live="polite">
-        {busy ? <><span className="dots" aria-hidden="true"><i /><i /><i /></span>{busy}</> : "Solve it ↗"}
+      <button className="primary generate" disabled={!!busy || (!file && !text.trim())} onClick={solve} aria-live="polite">
+        {busy ? <><span className="dots" aria-hidden="true"><i /><i /><i /></span>{busy}</> : "Generate my lesson ↗"}
       </button>
       {error && (
-        <p role="alert" className="callout">
+        <p role="alert" className="callout" style={{ marginTop: 14 }}>
           {error}{" "}
-          {code === "login_required" && <Link href={"/login?next=" + encodeURIComponent("/#solve")} className="underline">Sign in</Link>}
-          {code === "limit_reached" && <Link href="/pricing" className="underline">See Pro plans</Link>}
-          {code !== "login_required" && code !== "limit_reached" && <> <Link href="/lessons" className="underline">Browse similar lessons</Link></>}
+          {code === "login_required" && <Link href={"/login?next=" + encodeURIComponent("/solve")}>Sign in</Link>}
+          {code === "limit_reached" && <Link href="/pricing">See Pro plans</Link>}
+          {code !== "login_required" && code !== "limit_reached" && <Link href="/lessons">Browse similar lessons</Link>}
         </p>
       )}
-      <p className="uploadhint">JPG · PNG · screenshot · handwritten works too</p>
 
       {read && (
         <div className="overlay" onClick={(e) => e.target === e.currentTarget && setRead(null)}>
           <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="check-title">
-            <div className="kicker" style={{ justifySelf: "start" }}><b />Check · is this right?</div>
-            <h3 id="check-title">We read: <em>{read.solution.title}</em></h3>
-            {read.tags.length > 0 && <div className="tags">{read.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>}
+            <div className="eyebrow">CHECK · IS THIS RIGHT?</div>
+            <h2 id="check-title">We read: <em>{read.solution.title}</em></h2>
+            {read.tags.length > 0 && <div className="tags">{read.tags.map((t) => <span key={t}>{t}</span>)}</div>}
             <div className="readgrid">
               {read.fields.map((f) => {
                 const v = edits[f.key] ?? String(f.value);
                 return (
-                  <label key={f.key} className="field">
-                    <span>{f.label}{f.unit && ` (${f.unit})`}</span>
-                    <input className={`input ${v !== String(f.value) ? "edited" : ""}`} inputMode="decimal" value={v}
+                  <label key={f.key}>
+                    <span className="field-label">{f.label.toUpperCase()}{f.unit && ` (${f.unit})`}</span>
+                    <input className={`field ${v !== String(f.value) ? "edited" : ""}`} inputMode="decimal" value={v}
                       onChange={(e) => setEdits((s) => ({ ...s, [f.key]: e.target.value }))} />
                   </label>
                 );
               })}
             </div>
-            <p className="muted" style={{ margin: 0, fontSize: 13 }}>Tap a number to fix a misread. Wrong kind of problem? Go back and type the question instead.</p>
+            <p className="muted" style={{ margin: 0, fontSize: 12 }}>Tap a number to fix a misread. Wrong kind of problem? Go back and type the question instead.</p>
             {checkError && <p role="alert" className="callout">{checkError}</p>}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-              <button className="btn" onClick={() => { setRead(null); setTyping(true); }}>Back</button>
-              <button className="btn btn-primary" onClick={() => void confirm()}>Looks right →</button>
+            <div className="dialog-actions">
+              <button className="ghost" onClick={() => { setRead(null); setTyping(true); }}>Back</button>
+              <button className="primary" onClick={() => void confirm()}>Looks right →</button>
             </div>
           </div>
         </div>
       )}
-      <div className={`toast ${toast ? "show" : ""}`} role="status">{toast}</div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { playerKeyAction } from "@/components/StepPlayer";
+import { playerKeyAction } from "@/components/usePlayer";
 
 const key = (k: string, mods: Partial<Record<"altKey" | "ctrlKey" | "metaKey" | "shiftKey", boolean>> = {}) =>
   ({ key: k, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...mods });

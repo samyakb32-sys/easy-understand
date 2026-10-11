@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { SolveWorkspace } from "@/components/SolveWorkspace";
+import { LessonWorkspace } from "@/components/LessonWorkspace";
 import { supabaseConfigured } from "@/lib/env";
 import { Solution } from "@/lib/schema";
 import { currentUser, supabaseServer } from "@/lib/supabase/server";
@@ -15,5 +15,5 @@ export default async function SavedLesson({ params }: { params: Promise<{ id: st
   const { data } = await (await supabaseServer()).from("lessons").select("solution").eq("id", id).maybeSingle();
   const parsed = Solution.safeParse(data?.solution);
   if (!parsed.success) notFound();
-  return <SolveWorkspace initial={parsed.data} slug={`saved-${id}`} />;
+  return <LessonWorkspace initial={parsed.data} slug={`saved-${id}`} topic="My lesson" />;
 }

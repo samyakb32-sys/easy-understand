@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DrawingCanvas, tip } from "@/components/DrawingCanvas";
-import { frameDt, MAX_FRAME_DT } from "@/components/StepPlayer";
+import { frameDt, MAX_FRAME_DT } from "@/components/usePlayer";
 import type { Primitive } from "@/lib/schema";
 import { buildTimeline } from "@/lib/timeline";
 import { SAMPLES, getSample } from "@/lib/samples";

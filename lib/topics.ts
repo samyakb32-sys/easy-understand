@@ -5,8 +5,8 @@ export const TOPICS = [
   { id: "basics", label: "Lines & planes", categories: ["Orthographic projection", "Projection of planes", "Geometric construction"] },
   { id: "solids", label: "Solids", categories: ["Projection of solids", "Views & 3D from 2D"] },
   { id: "isometric", label: "Isometric", categories: ["Isometric view"] },
-  { id: "sections", label: "Sections & conics", categories: ["Sections of solids", "Engineering curves"] },
-  { id: "development", label: "Surface development", categories: ["Development of surfaces"] },
+  { id: "sections", label: "Sections & curves", categories: ["Sections of solids", "Engineering curves"] },
+  { id: "development", label: "Development", categories: ["Development of surfaces"] },
   { id: "interpenetration", label: "Interpenetration", categories: ["Interpenetration of solids"] },
 ] as const;
 

@@ -4,13 +4,18 @@ import Link from "next/link";
 
 export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <main className="page shell">
-      <h1>Something went wrong</h1>
-      <p className="lede" role="alert">Please try again. If it keeps happening, check your connection or come back in a few minutes.</p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-        <button type="button" className="btn btn-primary" onClick={reset}>Try again</button>
-        <Link href="/" className="btn">Back to home</Link>
-      </div>
-    </main>
+    <div className="app-shell">
+      <main className="page">
+        <section className="history-empty">
+          <div className="empty-icon" aria-hidden="true">⌁</div>
+          <h2>Something went wrong.</h2>
+          <p role="alert">Please try again. If it keeps happening, check your connection or come back in a few minutes.</p>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button type="button" className="primary" onClick={reset}>Try again</button>
+            <Link className="ghost" href="/">Back to home</Link>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }

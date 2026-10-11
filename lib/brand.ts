@@ -2,4 +2,5 @@
 export const BRAND = "linewise";
 export const BRAND_FULL = "linewise.";
 export const TAGLINE = "EGD, but make it click";
-export const pageTitle = (title: string) => `${title} · ${BRAND_FULL}`;
+/** Page titles: the root layout appends " · linewise." through its title template. */
+export const pageTitle = (title: string) => title;

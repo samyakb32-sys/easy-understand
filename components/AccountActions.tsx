@@ -23,15 +23,15 @@ export function CancelSubscription({ proUntil }: { proUntil: string }) {
 
   if (state === "done") return <p role="status" className="callout info">Your subscription won't renew. You keep Pro until {until}.</p>;
   return (
-    <div className="grid gap-3">
+    <div style={{ display: "grid", gap: 12, marginTop: 14 }}>
       {state === "idle" ? (
-        <button className="btn" onClick={() => setState("confirm")}>Cancel subscription</button>
+        <button className="ghost" onClick={() => setState("confirm")}>Cancel subscription</button>
       ) : (
         <div className="callout">
           Stop renewing? You keep Pro until {until}, then your account goes back to Free.
-          <div className="mt-3 flex gap-2">
-            <button className="btn" onClick={cancel} disabled={state === "busy"}>{state === "busy" ? "Cancelling…" : "Yes, stop renewing"}</button>
-            <button className="btn" onClick={() => setState("idle")} disabled={state === "busy"}>Keep it</button>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            <button className="primary" onClick={cancel} disabled={state === "busy"}>{state === "busy" ? "Cancelling…" : "Yes, stop renewing"}</button>
+            <button className="ghost" onClick={() => setState("idle")} disabled={state === "busy"}>Keep it</button>
           </div>
         </div>
       )}

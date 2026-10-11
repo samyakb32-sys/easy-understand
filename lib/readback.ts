@@ -2,7 +2,7 @@
 export type ReadField = { key: string; label: string; value: number; unit: string };
 
 const LABELS: Record<string, string> = {
-  thetaHP: "Angle to HP", phiVP: "Angle to VP", angle: "Angle", phi: "Second angle", axisHeight: "Axis height",
+  size: "Size (side or diameter)", thetaHP: "Angle to HP", phiVP: "Angle to VP", angle: "Angle", phi: "Second angle", axisHeight: "Axis height",
   axisOffset: "Axis offset", holeDiameter: "Hole diameter", holeDepth: "Hole depth", notchLength: "Notch length",
   notchWidth: "Notch width", notchDepth: "Notch depth", mainDiameter: "Main diameter", mainHeight: "Main height",
   branchDiameter: "Branch diameter", coneDiameter: "Cone diameter", coneHeight: "Cone height",

@@ -67,11 +67,16 @@ export default async function LegalPage({ params }: { params: Promise<{ doc: str
   const d = DOCS[doc];
   if (!d) notFound();
   return (
-    <main className="page shell">
-      <Link href="/" className="back">← back home</Link>
-      <h1>{d.title}</h1>
-      <p className="callout info" style={{ maxWidth: 760, marginBottom: 22 }}>Draft: this text has not been reviewed by a lawyer and still contains placeholders in [square brackets].</p>
-      <div className="prose">{d.body.map((p, i) => <p key={i}>{p}</p>)}</div>
-    </main>
+    <div className="app-shell">
+      <main className="page legal">
+        <div className="eyebrow">LINEWISE LEGAL</div>
+        <h1 className="screen-heading" style={{ margin: "10px 0 0", font: "800 clamp(37px,5vw,60px)/.96 Syne,sans-serif", letterSpacing: "-3px" }}>{d.title}</h1>
+        <nav className="legal-nav filters" aria-label="Legal pages">
+          {Object.entries(DOCS).map(([k, v]) => <Link key={k} href={`/legal/${k}`} className={`filter ${k === doc ? "active" : ""}`} aria-current={k === doc ? "page" : undefined}>{v.title}</Link>)}
+        </nav>
+        <p className="callout info draft-note">Draft: this text has not been reviewed by a lawyer and still contains placeholders in [square brackets].</p>
+        {d.body.map((p, i) => <p key={i}>{p}</p>)}
+      </main>
+    </div>
   );
 }

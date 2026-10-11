@@ -69,7 +69,7 @@ const fail = (body: Fail, status: number) => NextResponse.json(body, { status, h
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return fail({ ok: false, reason: "The AI solver isn't configured yet (missing ANTHROPIC_API_KEY). Try one of the example lessons." }, 503);
+    return fail({ ok: false, reason: "Solving your own questions isn't switched on yet. Meanwhile, every sample lesson works." }, 503);
   }
   if (!sameOrigin(req)) return fail({ ok: false, reason: "Bad origin." }, 403);
   const parsed = Body.safeParse(await req.json().catch(() => null));

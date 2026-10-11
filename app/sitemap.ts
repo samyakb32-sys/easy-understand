@@ -1,7 +1,11 @@
 import type { MetadataRoute } from "next";
+import { SAMPLES } from "@/lib/samples";
 import { siteUrl } from "@/lib/site";
 
-// the site is one page (public/site.html, served at /) with hash routes
+// keep in step with DOCS in app/legal/[doc]/page.tsx
+const LEGAL = ["terms", "privacy", "refunds", "contact"];
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [{ url: siteUrl() + "/" }];
+  const base = siteUrl();
+  return ["/", "/solve", "/lessons", "/pricing", ...LEGAL.map((d) => `/legal/${d}`), ...Object.keys(SAMPLES).map((s) => `/lessons/${s}`)].map((path) => ({ url: base + path }));
 }

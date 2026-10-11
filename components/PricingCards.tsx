@@ -48,7 +48,7 @@ export function PricingCards() {
 
   const buy = async (plan: Plan) => {
     setMsg(null);
-    if (plan.id === "free") { router.push(me?.signedIn ? "/#solve" : "/login?next=" + encodeURIComponent("/#solve")); return; }
+    if (plan.id === "free") { router.push(me?.signedIn ? "/solve" : "/login?next=" + encodeURIComponent("/solve")); return; }
     if (!me) {
       if (failed) { setMsg({ tone: "error", text: "We couldn't check your account. Check your connection and try again." }); void retry(); }
       return;
@@ -69,7 +69,7 @@ export function PricingCards() {
         name: BRAND_FULL,
         description: data.label,
         prefill: { email: data.email },
-        theme: { color: "#684bff" },
+        theme: { color: "#635bff" },
         ...(data.kind === "subscription" ? { subscription_id: data.id } : { order_id: data.id, amount: data.amountPaise, currency: "INR" }),
         modal: { ondismiss: () => setBusy(null) },
         handler: async (r: Record<string, string>) => {
@@ -94,29 +94,31 @@ export function PricingCards() {
   };
 
   const current = me?.signedIn && me.isPro ? me.planId : null;
+  const label = (p: Plan) => (p.highlight ? "BEST VALUE" : p.id === "free" ? "START HERE" : p.id === "exam" ? "EXAM SEASON" : "MOST FLEXIBLE");
   return (
     <>
-      <div className="plans">
+      <section className="plan-grid">
         {PLANS.map((p) => {
           const isCurrent = (p.id === "free" && me?.signedIn && !me.isPro) || (current !== null && p.id === current);
           return (
-            <div key={p.id} className={`card plan ${p.highlight ? "hl" : ""}`}>
-              {p.highlight && <span className="badge">BEST VALUE ✦</span>}
-              <h3>{p.name}</h3>
-              <div className="price">{p.price}</div>
-              <div className="muted" style={{ fontSize: 12, marginTop: -4 }}>{p.note}</div>
+            <article key={p.id} className={`plan ${p.highlight ? "featured" : ""}`}>
+              <div>
+                <span className="plan-label">{label(p)}</span>
+                <h3>{p.name}</h3>
+                <div className="price">{p.price} <span>{p.note}</span></div>
+              </div>
               <ul>{p.features.map((f) => <li key={f}>{f}</li>)}</ul>
-              <button className={`btn ${p.highlight ? "btn-primary" : ""}`} disabled={busy !== null || isCurrent || (!me && !failed)} onClick={() => buy(p)}>
-                {busy === p.id ? "Opening payment…" : isCurrent ? "Your current plan" : p.id === "free" ? "Start free" : `Get ${p.name}`}
+              <button className={p.highlight ? "primary" : "ghost"} disabled={busy !== null || isCurrent || (!me && !failed)} onClick={() => buy(p)}>
+                {busy === p.id ? "Opening payment…" : isCurrent ? "Current plan" : p.id === "free" ? "Start free" : `Choose ${p.name}`}
               </button>
-            </div>
+            </article>
           );
         })}
-      </div>
+      </section>
       {msg && <p role={msg.tone === "error" ? "alert" : "status"} className={`callout ${msg.tone === "info" ? "info" : ""}`} style={{ marginTop: 16 }}>{msg.text}</p>}
-      <p className="muted" style={{ fontSize: 11, marginTop: 18, maxWidth: 720 }}>
+      <p className="micro" style={{ marginTop: 18, maxWidth: 760, lineHeight: 1.6 }}>
         Payments by Razorpay (UPI, cards, netbanking). Subscriptions renew automatically and you can cancel any time from your account; you keep Pro until the end of the period you paid for.
-        See the <a href="/legal/refunds" className="underline">refund policy</a>.
+        See the <a href="/legal/refunds" style={{ textDecoration: "underline" }}>refund policy</a>.
       </p>
     </>
   );

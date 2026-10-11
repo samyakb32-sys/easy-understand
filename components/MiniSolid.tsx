@@ -23,7 +23,7 @@ export function MiniSolid({ spec, label }: { spec: SolidSpec; label: string }) {
       ctx.setTransform(d, 0, 0, d, 0, 0);
       const w = r.width, h = r.height;
       ctx.clearRect(0, 0, w, h);
-      const ink = css("--ink") || "#151b27", violet = css("--violet") || "#684bff", acid = css("--acid") || "#d5fa54", hot = css("--hot") || "#fa4b2a";
+      const ink = css("--ink") || "#151b27", violet = css("--violet") || "#684bff", acid = css("--lime") || "#d9fa5c", hot = css("--coral") || "#ff6a51";
       const { yaw, pitch } = view.current;
       const rot = mesh.verts.map((v) => rotate(v, yaw, pitch));
       const sc = Math.min(w * 0.3, h * 0.36);
@@ -68,13 +68,15 @@ export function MiniSolid({ spec, label }: { spec: SolidSpec; label: string }) {
     const move = (e: PointerEvent) => {
       if (!drag) return;
       view.current.yaw += (e.clientX - drag[0]) * 0.009;
-      view.current.pitch = Math.max(-0.65, Math.min(0.9, view.current.pitch + (e.clientY - drag[1]) * 0.008));
+      // dragging down tips the model toward the viewer, so its near face follows the pointer
+      view.current.pitch = Math.max(-0.65, Math.min(0.9, view.current.pitch - (e.clientY - drag[1]) * 0.008));
       drag = [e.clientX, e.clientY];
       render();
     };
     const up = () => { drag = null; };
     const key = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") { view.current.yaw += e.key === "ArrowLeft" ? -0.15 : 0.15; e.preventDefault(); render(); }
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") { view.current.pitch = Math.max(-0.65, Math.min(0.9, view.current.pitch + (e.key === "ArrowUp" ? 0.1 : -0.1))); e.preventDefault(); render(); }
     };
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", move);
