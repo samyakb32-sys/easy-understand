@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import robots from "../app/robots";
 import sitemap from "../app/sitemap";
-import { SAMPLES } from "@/lib/samples";
 
 describe("robots and sitemap", () => {
   it("hides private routes", () => {
@@ -10,12 +9,7 @@ describe("robots and sitemap", () => {
     for (const p of ["/api/", "/account", "/history", "/auth/", "/login"]) expect(rule.disallow).toContain(p);
     expect(r.sitemap).toMatch(/\/sitemap\.xml$/);
   });
-  it("lists home, lessons, pricing, legal and every sample lesson", () => {
-    const urls = sitemap().map((e) => e.url);
-    expect(urls.length).toBe(3 + 4 + Object.keys(SAMPLES).length);
-    for (const p of ["/lessons", "/pricing"]) expect(urls.some((u) => u.endsWith(p))).toBe(true);
-    expect(urls.some((u) => u.endsWith("/legal/refunds"))).toBe(true);
-    expect(urls.some((u) => u.endsWith("/solve/isometric-prism"))).toBe(true);
-    expect(new Set(urls).size).toBe(urls.length);
+  it("lists the one-page site", () => {
+    expect(sitemap().map((e) => e.url)).toEqual([expect.stringMatching(/\/$/)]);
   });
 });
