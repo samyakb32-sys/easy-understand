@@ -135,3 +135,28 @@ describe("POST /api/solve robustness", () => {
     expect(body.savedId).toBe("L1");
   });
 });
+
+describe("POST /api/solve with another provider", () => {
+  afterEach(() => { delete process.env.AI_PROVIDER; delete process.env.AI_API_KEY; delete process.env.AI_MODEL; });
+  it("solves through an OpenAI-compatible provider such as NVIDIA", async () => {
+    process.env.AI_PROVIDER = "nvidia"; process.env.AI_API_KEY = "nv"; process.env.AI_MODEL = "some/vision-model";
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: '{"template":"pentagon","side":30}' } }] }), { status: 200 }));
+    const body = await (await call()).json();
+    expect(body.ok).toBe(true);
+    expect(body.template).toEqual({ template: "pentagon", side: 30 });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
+  });
+  it("is switched off when the provider is incomplete", async () => {
+    process.env.AI_PROVIDER = "nvidia"; process.env.AI_MODEL = "m";
+    const res = await call();
+    expect(res.status).toBe(503);
+    expect(rpcNames()).toEqual([]);
+  });
+  it("a provider outage is refunded in full", async () => {
+    process.env.AI_PROVIDER = "groq"; process.env.AI_API_KEY = "g"; process.env.AI_MODEL = "m";
+    fetchMock.mockResolvedValue(new Response("down", { status: 502 }));
+    const res = await call();
+    expect(res.status).toBe(500);
+    expect(rpcNames()).toEqual(["consume_solve", "refund_solve"]);
+  });
+});

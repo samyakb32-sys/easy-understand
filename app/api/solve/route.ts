@@ -1,10 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { solveTemplate, Template } from "@/lib/geometry/solvers";
 import { serviceRoleConfigured, solverNeedsLogin } from "@/lib/env";
 import { sameOrigin } from "@/lib/http";
 import { loadEntitlements } from "@/lib/me";
+import { askModel, extractJson, providerConfig, ProviderError } from "@/lib/solver/provider";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { currentUser } from "@/lib/supabase/server";
 
@@ -68,7 +68,8 @@ type Fail = { ok: false; reason: string; code?: "login_required" | "limit_reache
 const fail = (body: Fail, status: number) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const ai = providerConfig();
+  if (!ai) {
     return fail({ ok: false, reason: "Solving your own questions isn't switched on yet. Meanwhile, every sample lesson works." }, 503);
   }
   if (!sameOrigin(req)) return fail({ ok: false, reason: "Bad origin." }, 403);
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
       return fail({ ok: false, reason: "Something went wrong. Please try again." }, 500);
     }
   }
-  // A failure that is ours (Anthropic or network trouble, a timeout) gives the solve back in full.
+  // A failure that is ours (AI provider or network trouble, a timeout) gives the solve back in full.
   const refund = async () => {
     if (userId) await supabaseAdmin().rpc("refund_solve", { p_user: userId }).then(() => {}, (e) => console.error("refund failed", e));
   };
@@ -121,24 +122,9 @@ export async function POST(req: Request) {
     return fail(kept || !userId ? body : { ...body, reason: `${body.reason} This attempt used one of today's solves.` }, status);
   };
 
-  const content: Anthropic.ContentBlockParam[] = [];
-  if (image) content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: image } });
-  content.push({ type: "text", text: text?.trim() ? `Problem text: ${text.trim()}` : "Classify the problem in this image." });
-
-  const client = new Anthropic({ maxRetries: 1 });
   try {
-    const response = await client.beta.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5",
-      max_tokens: 2000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "medium" },
-      system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content }],
-    }, { signal: AbortSignal.timeout(MODEL_DEADLINE_MS) });
-    const raw = response.content.find((b) => b.type === "text")?.text ?? "";
-    const json = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
-    const reply = Reply.safeParse(JSON.parse(json));
+    const raw = await askModel(ai, { system: SYSTEM, image, mediaType, text, signal: AbortSignal.timeout(MODEL_DEADLINE_MS) });
+    const reply = Reply.safeParse(extractJson(raw));
     if (!reply.success) return miss({ ok: false, reason: "I couldn't understand that problem's numbers. Try a clearer photo, or type the problem." }, 422);
     if (reply.data.template === "unsupported") return miss({ ok: false, reason: reply.data.reason }, 422);
 
@@ -156,15 +142,16 @@ export async function POST(req: Request) {
     // `template` lets the student check the numbers that were read, and re-solve in the browser if one was misread
     return NextResponse.json({ ...result, template: reply.data, savedId, saved: userId && isPro ? savedId !== null : undefined }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) return give({ ok: false, reason: "Too many requests right now. Please try again in a minute." }, 429);
-    if (e instanceof Anthropic.AuthenticationError) return give({ ok: false, reason: "The AI solver's API key is invalid." }, 503);
-    if (e instanceof Anthropic.APIUserAbortError || e instanceof Anthropic.APIConnectionTimeoutError) {
-      return give({ ok: false, reason: "The AI took too long to answer. Please try again." }, 504);
+    if (e instanceof ProviderError) {
+      if (e.kind === "rate_limit") return give({ ok: false, reason: "Too many requests right now. Please try again in a minute." }, 429);
+      if (e.kind === "auth") { console.error(`${ai.label} rejected the API key`, e.message); return give({ ok: false, reason: "The AI solver isn't available right now. Please try again later." }, 503); }
+      if (e.kind === "timeout") return give({ ok: false, reason: "The AI took too long to answer. Please try again." }, 504);
+      console.error(`${ai.label} call failed`, e.message);
+      return give({ ok: false, reason: "Something went wrong while solving. Please try again." }, 500);
     }
     // an unreadable answer or a solver crash is the model's output not being usable, not an outage: it counts as a miss
     if (e instanceof SyntaxError) return miss({ ok: false, reason: "The AI gave an unreadable answer. Please try again." }, 502);
     console.error("solve failed", e);
-    const body: Fail = { ok: false, reason: "Something went wrong while solving. Please try again." };
-    return e instanceof Anthropic.APIError ? give(body, 500) : miss(body, 500);
+    return miss({ ok: false, reason: "Something went wrong while solving. Please try again." }, 500);
   }
 }

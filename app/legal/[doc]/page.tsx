@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PAID_PLANS, rupees } from "@/lib/pricing";
+import { providerConfig } from "@/lib/solver/provider";
 
 /**
  * DRAFT policies, written to match how the site actually works so they can be used for the Razorpay activation
@@ -10,6 +11,9 @@ import { PAID_PLANS, rupees } from "@/lib/pricing";
  */
 const BUSINESS = "linewise. (operated by [your registered business name], [address], India)";
 const CONTACT = "[support email]";
+// the privacy policy names whichever AI provider is configured (lib/solver/provider.ts)
+const AI = providerConfig();
+const AI_NAME = AI && AI.label !== "our AI provider" ? AI.label : null;
 
 const DOCS: Record<string, { title: string; body: string[] }> = {
   terms: {
@@ -30,7 +34,7 @@ const DOCS: Record<string, { title: string; body: string[] }> = {
     body: [
       `${BUSINESS} collects only what it needs to run the service.`,
       "Account: your email address (and your name and picture if you sign in with Google), handled by our sign-in provider, Supabase.",
-      "Your problems: photos or text you upload are sent to our AI provider, Anthropic, to read the problem, and are not kept by us after solving. If you are a Pro student, the resulting lesson (title and drawing steps, not your photo) is saved to your history.",
+      `Your problems: photos or text you upload are sent to our AI provider${AI_NAME ? `, ${AI_NAME},` : ""} to read the problem, and are not kept by us after solving. If you are a Pro student, the resulting lesson (title and drawing steps, not your photo) is saved to your history.`,
       "Payments: handled by Razorpay. We receive the payment and subscription identifiers, the plan, the amount and the date. We do not receive your card, UPI or bank details.",
       "We use these providers only to run the service and do not sell your data. We use essential cookies to keep you signed in.",
       `You can ask us to delete your account and data at any time: ${CONTACT}.`,

@@ -6,7 +6,7 @@ Upload an Engineering Graphics & Design (EGD) problem, watch it drawn step by st
 
 ```bash
 npm install
-cp .env.example .env.local   # add ANTHROPIC_API_KEY to enable photo upload solving
+cp .env.example .env.local   # add an AI key (ANTHROPIC_API_KEY, or AI_PROVIDER + AI_API_KEY + AI_MODEL) to enable solving
 npm run dev                  # http://localhost:3000
 npm test                     # geometry + schema tests
 ```
@@ -41,7 +41,7 @@ Sign-in and the database use **Supabase**; payments use **Razorpay**. Nothing he
 - Pro is simply `entitlements.pro_until` being in the future. Subscription payments and the Exam pack only ever move that date forward, so a cancelled subscription keeps working to the end of the paid period and then lapses on its own.
 - Prices come from `lib/pricing.ts` on the server; the browser cannot choose an amount.
 - After Checkout the browser calls `/api/checkout/verify` (checks the payment signature and that the payment belongs to that student). The **webhook is the source of truth** for renewals, and both paths are idempotent, so retries or double delivery never double-count.
-- AI solves need a signed-in student and are counted per day in India time (`FREE_DAILY_SOLVES`, `PRO_DAILY_SOLVES` in `lib/pricing.ts`). A solve is refunded in full when the failure is ours (Anthropic or network trouble, a timeout). When the AI cannot read the problem or says it is unsupported, the model call was still paid for, so those are refunded only for the first 5 misses a day (`MISS_REFUNDS_PER_DAY` in `app/api/solve/route.ts`).
+- AI solves need a signed-in student and are counted per day in India time (`FREE_DAILY_SOLVES`, `PRO_DAILY_SOLVES` in `lib/pricing.ts`). A solve is refunded in full when the failure is ours (AI provider or network trouble, a timeout). When the AI cannot read the problem or says it is unsupported, the model call was still paid for, so those are refunded only for the first 5 misses a day (`MISS_REFUNDS_PER_DAY` in `app/api/solve/route.ts`).
 - Everything is tested with `npm test`: signatures, webhook handling, idempotency, checkout/verify, entitlements.
 
 ### Before you take real money
